@@ -1,0 +1,37 @@
+﻿<div id='tournament-container' class='drop-shadow-highlight'>
+    <div v-if='tournamentSize > 0' class='tournament-container-inner'>
+        <div id='tournament-label' class='drop-shadow'>
+            {{labels.Tournament}}
+        </div>
+        <div id='tournament-items' class='drop-shadow'>
+            <div v-for='index in range(0, Math.max(tournamentSize, entrants))' class='tournament-range'>
+                <transition name='tournament-entry-t' tag='div' mode='out-in' appear>
+                    <div v-if='index < entrants && index < tournamentSize - 1'
+                         class='tournament-entry tournament-in-next' v-bind:key="index + 'in-next'"></div>
+                    <div v-else-if='index < entrants && index === tournamentSize - 1'
+                         class='tournament-entry tournament-last-slot' v-bind:key="index + 'last-slot'"></div>
+                    <div v-else-if='index > tournamentSize - 1'
+                         class='tournament-entry tournament-overflow' v-bind:key="index + 'overflow'"></div>
+                    <div v-else
+                         class='tournament-entry tournament-empty' v-bind:key="index + 'empty'"></div>
+                </transition>
+            </div>
+        </div>
+    </div>
+    <div v-if="bettingState === 'open'" class='tournament-bets-label drop-shadow'>
+        <span style='color: green'>{{labels.BettingIsOpen}}</span>
+    </div>
+    <div v-else-if="bettingState === 'closed'" class='tournament-bets-label drop-shadow'>
+        <span style='color: #ff4c4c'>{{labels.BettingIsClosed}}</span>
+    </div>
+    <div v-else-if="bettingState === 'disabled'" class='tournament-bets-label drop-shadow'>
+        <span style='color: gray'>{{labels.NotTakingBets}}</span>
+    </div>
+    <div v-if="bettingState === 'open' || bettingState === 'closed'" class='drop-shadow tournament-bet-bar'>
+        <div v-for='(b, index) in betRatios' class='tournament-bet-bar-item'
+             v-bind:class="'tournament-bet-side-' + index"
+             v-bind:style="{ 'flex': b.ratio + ' 0 0' }">
+            <div class='tournament-bet-text gold-text-style'>{{formatBet(b.bet)}}⦷</div>
+        </div>
+    </div>
+</div>

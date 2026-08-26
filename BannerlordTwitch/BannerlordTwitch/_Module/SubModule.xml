@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Module>
+	<Name value = "BannerlordTwitch"/>
+	<Id value = "BannerlordTwitch"/>
+	<Version value = "v$version$"/>
+	<DefaultModule value="true"/>
+	<SingleplayerModule value="true"/>
+	<Official value="false" />
+	<DependedModules>
+		<DependedModule Id="Bannerlord.Harmony"/>
+		<DependedModule Id="Native"/>
+		<DependedModule Id="SandBoxCore"/>
+		<DependedModule Id="Sandbox"/>
+		<DependedModule Id="StoryMode"/>
+		<DependedModule Id="NavalDLC"/>
+		<DependedModule Id="CustomBattle"/>
+	</DependedModules>
+	<SubModules>
+		<SubModule>
+			<Name value = "BannerlordTwitch"/>
+			<DLLName value = "BannerlordTwitch.dll"/>
+			<SubModuleClassType value = "BannerlordTwitch.BLTModule"/>
+			<Tags>
+			</Tags>
+		</SubModule>
+	</SubModules>
+	<DependedModuleMetadatas>
+		<!-- order: [ "LoadBeforeThis", "LoadAfterThis" ] -->
+		<!-- optional: [ "true", "false" ] -->
+		<!-- version: [ "e1.0.0.0", "e1.*", "e1.0.*", "e1.0.0.*" ] -->
+		<!-- incompatible: [ "true", "false" ] -->
+		<DependedModuleMetadata id="Bannerlord.Harmony" order="LoadBeforeThis" />
+		<DependedModuleMetadata id="Native" order="LoadBeforeThis" />
+		<DependedModuleMetadata id="SandBoxCore" order="LoadBeforeThis" />
+		<DependedModuleMetadata id="Sandbox" order="LoadBeforeThis" />
+		<DependedModuleMetadata id="StoryMode" order="LoadBeforeThis" />
+		<DependedModuleMetadata id="NavalDLC" order="LoadBeforeThis" />
+		<DependedModuleMetadata id="CustomBattle" order="LoadBeforeThis" />
+	</DependedModuleMetadatas>
+	<Xmls>
+	</Xmls>
+</Module>

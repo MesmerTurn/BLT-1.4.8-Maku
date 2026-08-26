@@ -1,0 +1,990 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using BannerlordTwitch.Localization;
+using BannerlordTwitch.UI;
+using BannerlordTwitch.Util;
+using BLTAdoptAHero.Annotations;
+using Xceed.Wpf.Toolkit.PropertyGrid.Attributes;
+
+namespace BLTAdoptAHero.Actions.Upgrades
+{
+    public abstract class UpgradeBase : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        private string _id = "";
+        [LocDisplayName("{=BLT_UpgradeID}Upgrade ID"),
+         LocDescription("{=BLT_UpgradeIDDesc}Unique identifier for this upgrade (use for tiered upgrades)"),
+         PropertyOrder(1), UsedImplicitly]
+        public string ID
+        {
+            get => _id;
+            set { if (_id != value) { _id = value; OnPropertyChanged(nameof(ID)); } }
+        }
+
+        private string _name = "New Upgrade";
+        [LocDisplayName("{=BLT_UpgradeName}Upgrade Name"),
+         LocDescription("{=BLT_UpgradeNameDesc}Display name shown to players"),
+         PropertyOrder(2), UsedImplicitly, InstanceName]
+        public string Name
+        {
+            get => _name;
+            set { if (_name != value) { _name = value; OnPropertyChanged(nameof(Name)); } }
+        }
+
+        private string _description = "Upgrade description";
+        [LocDisplayName("{=BLT_UpgradeDesc}Description"),
+         LocDescription("{=BLT_UpgradeDescDesc}Description of what this upgrade does"),
+         PropertyOrder(3), UsedImplicitly]
+        public string Description
+        {
+            get => _description;
+            set { if (_description != value) { _description = value; OnPropertyChanged(nameof(Description)); } }
+        }
+
+        private int _tierLevel = 0;
+        [LocDisplayName("{=BLT_UpgradeTier}Tier Level (Cosmetic)"),
+         LocDescription("{=BLT_UpgradeTierDesc}Cosmetic Only: Tier level (0 for non-tiered, 1+ to display tier levels)"),
+         PropertyOrder(4), UsedImplicitly]
+        public int TierLevel
+        {
+            get => _tierLevel;
+            set { if (_tierLevel != value) { _tierLevel = value; OnPropertyChanged(nameof(TierLevel)); } }
+        }
+
+        private string _requiredUpgradeID = "";
+        [LocDisplayName("{=BLT_UpgradeRequired}Required Upgrade ID(s)"),
+         LocDescription("{=BLT_UpgradeRequiredDesc}ID(s) of upgrades required before this can be purchased. Comma-separated. Leave empty for tier 1."),
+         PropertyOrder(5), UsedImplicitly]
+        public string RequiredUpgradeID
+        {
+            get => _requiredUpgradeID;
+            set { if (_requiredUpgradeID != value) { _requiredUpgradeID = value; OnPropertyChanged(nameof(RequiredUpgradeID)); } }
+        }
+
+        public List<string> RequiredUpgradeIDs
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(_requiredUpgradeID)) return new List<string>();
+                return _requiredUpgradeID.Split(',').Select(id => id.Trim()).Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+            }
+        }
+
+        public bool IsUpgradeRequired(string upgradeId) => RequiredUpgradeIDs.Contains(upgradeId, StringComparer.OrdinalIgnoreCase);
+        public bool AreRequiredUpgradesMet(HashSet<string> ownedUpgrades)
+            => RequiredUpgradeIDs.All(id => ownedUpgrades.Contains(id, StringComparer.OrdinalIgnoreCase));
+
+        private int _goldCost = 10000;
+        [LocDisplayName("{=BLT_UpgradeGoldCost}Gold Cost"),
+         LocDescription("{=BLT_UpgradeGoldCostDesc}Cost in gold to purchase this upgrade"),
+         PropertyOrder(6), UsedImplicitly]
+        public int GoldCost
+        {
+            get => _goldCost;
+            set { if (_goldCost != value) { _goldCost = value; OnPropertyChanged(nameof(GoldCost)); } }
+        }
+
+        private bool _coastalOnly = false;
+        [LocDisplayName("{=BLT_coastalOnly}Coastal Settlements Only"),
+         LocDescription("{=BLT_coastalOnlyDesc}Whether this upgrade applies to non-coastal settlements (and their bound villages)"),
+         PropertyOrder(7), UsedImplicitly, DefaultValue(false)]
+        public bool CoastalOnly
+        {
+            get => _coastalOnly;
+            set { if (_coastalOnly != value) { _coastalOnly = value; OnPropertyChanged(nameof(CoastalOnly)); } }
+        }
+
+        private bool _capitalOnly = false;
+        [LocDisplayName("{=BLT_CapitalOnly}Capital Only"),
+         LocCategory("General", "{=GeneralCat}General"),
+         LocDescription("{=BLT_CapitalOnlyDesc}If true, this upgrade applies only to the clan's capital settlement and is stored at clan level (follows the capital if moved, never applies to non-capital settlements)."),
+         PropertyOrder(8), UsedImplicitly, DefaultValue(false)]
+        public bool CapitalOnly
+        {
+            get => _capitalOnly;
+            set { if (_capitalOnly != value) { _capitalOnly = value; OnPropertyChanged(nameof(CapitalOnly)); } }
+        }
+
+        private bool _canBeRemoved = false;
+        [LocDisplayName("{=BLT_CanBeRemoved}Can Be Removed"),
+         LocDescription("{=BLT_CanBeRemovedDesc}Whether this upgrade can be removed after purchase (no refund)"),
+         PropertyOrder(9), UsedImplicitly]
+        public bool CanBeRemoved
+        {
+            get => _canBeRemoved;
+            set { if (_canBeRemoved != value) { _canBeRemoved = value; OnPropertyChanged(nameof(CanBeRemoved)); } }
+        }
+
+        public virtual string GetCostString() => $"{GoldCost}{Naming.Gold}";
+
+        public virtual string GetFullDescription()
+        {
+            string desc = $"{Name}";
+            if (TierLevel >= 1) desc += $" (Tier {TierLevel})";
+            desc += $"\n{Description}\nCost: {GetCostString()}";
+            if (!string.IsNullOrEmpty(RequiredUpgradeID)) desc += $"\nRequires: {RequiredUpgradeID}";
+            desc += $"\nCan be removed: {CanBeRemoved}";
+            return desc;
+        }
+
+        public override string ToString() => string.IsNullOrEmpty(Name) ? "New Upgrade" : Name;
+    }
+
+    public enum TroopTreeType
+    {
+        Basic = 0,
+        Noble = 1
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FiefUpgrade
+    // ─────────────────────────────────────────────────────────────────────────
+    [CategoryOrder("General", 0),
+     CategoryOrder("Daily Growth Effects", 1),
+     CategoryOrder("Static Bonuses", 2),
+     CategoryOrder("Garrison Troop Spawning", 3)]
+    public class FiefUpgrade : UpgradeBase
+    {
+        // ── Daily Growth Effects ──────────────────────────────────────────────
+        [LocDisplayName("{=BLT_LoyaltyFlat}Loyalty Daily (Flat)"),
+         LocCategory("Daily Growth Effects", "{=BLT_DailyGrowth}Daily Growth Effects"),
+         LocDescription("{=BLT_LoyaltyFlatDesc}Flat loyalty gain per day (e.g., +0.5 loyalty per day)"),
+         PropertyOrder(1), UsedImplicitly]
+        public float LoyaltyDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_LoyaltyPercent}Loyalty Daily (%)"),
+         LocCategory("Daily Growth Effects", "{=BLT_DailyGrowth}Daily Growth Effects"),
+         LocDescription("{=BLT_LoyaltyPercentDesc}Percentage bonus to loyalty change per day (e.g., 10 = +10% of natural change)"),
+         PropertyOrder(2), UsedImplicitly]
+        public float LoyaltyDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_ProsperityFlat}Prosperity Daily (Flat)"),
+         LocCategory("Daily Growth Effects", "{=BLT_DailyGrowth}Daily Growth Effects"),
+         LocDescription("{=BLT_ProsperityFlatDesc}Flat prosperity gain per day"),
+         PropertyOrder(3), UsedImplicitly]
+        public float ProsperityDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_ProsperityPercent}Prosperity Daily (%)"),
+         LocCategory("Daily Growth Effects", "{=BLT_DailyGrowth}Daily Growth Effects"),
+         LocDescription("{=BLT_ProsperityPercentDesc}Percentage bonus to prosperity change per day"),
+         PropertyOrder(4), UsedImplicitly]
+        public float ProsperityDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_SecurityFlat}Security Daily (Flat)"),
+         LocCategory("Daily Growth Effects", "{=BLT_DailyGrowth}Daily Growth Effects"),
+         LocDescription("{=BLT_SecurityFlatDesc}Flat security gain per day"),
+         PropertyOrder(5), UsedImplicitly]
+        public float SecurityDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_SecurityPercent}Security Daily (%)"),
+         LocCategory("Daily Growth Effects", "{=BLT_DailyGrowth}Daily Growth Effects"),
+         LocDescription("{=BLT_SecurityPercentDesc}Percentage bonus to security change per day"),
+         PropertyOrder(6), UsedImplicitly]
+        public float SecurityDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_MilitiaFlat}Militia Daily (Flat)"),
+         LocCategory("Daily Growth Effects", "{=BLT_DailyGrowth}Daily Growth Effects"),
+         LocDescription("{=BLT_MilitiaFlatDesc}Flat militia gain per day"),
+         PropertyOrder(7), UsedImplicitly]
+        public float MilitiaDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_MilitiaPercent}Militia Daily (%)"),
+         LocCategory("Daily Growth Effects", "{=BLT_DailyGrowth}Daily Growth Effects"),
+         LocDescription("{=BLT_MilitiaPercentDesc}Percentage bonus to militia change per day"),
+         PropertyOrder(8), UsedImplicitly]
+        public float MilitiaDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_FoodFlat}Food Daily (Flat)"),
+         LocCategory("Daily Growth Effects", "{=BLT_DailyGrowth}Daily Growth Effects"),
+         LocDescription("{=BLT_FoodFlatDesc}Flat food stock gain per day"),
+         PropertyOrder(9), UsedImplicitly]
+        public float FoodDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_FoodPercent}Food Daily (%)"),
+         LocCategory("Daily Growth Effects", "{=BLT_DailyGrowth}Daily Growth Effects"),
+         LocDescription("{=BLT_FoodPercentDesc}Percentage bonus to food change per day"),
+         PropertyOrder(10), UsedImplicitly]
+        public float FoodDailyPercent { get; set; } = 0f;
+
+        // ── Static Bonuses ────────────────────────────────────────────────────
+        [LocDisplayName("{=BLT_TaxFlat}Tax Income (Flat)"),
+         LocCategory("Static Bonuses", "{=BLT_StaticBonuses}Static Bonuses"),
+         LocDescription("{=BLT_TaxFlatDesc}Flat daily gold bonus from taxes"),
+         PropertyOrder(1), UsedImplicitly]
+        public int TaxIncomeFlat { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_TaxPercent}Tax Income (%)"),
+         LocCategory("Static Bonuses", "{=BLT_StaticBonuses}Static Bonuses"),
+         LocDescription("{=BLT_TaxPercentDesc}Percentage bonus to tax income"),
+         PropertyOrder(2), UsedImplicitly]
+        public float TaxIncomePercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_GarrisonCap}Garrison Capacity Bonus"),
+         LocCategory("Static Bonuses", "{=BLT_StaticBonuses}Static Bonuses"),
+         LocDescription("{=BLT_GarrisonCapDesc}Additional garrison troop capacity (Warning: High values may cause issues)"),
+         PropertyOrder(3), UsedImplicitly]
+        public int GarrisonCapacityBonus { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_Hearth}Hearth Daily"),
+         LocCategory("Static Bonuses", "{=BLT_StaticBonuses}Static Bonuses"),
+         LocDescription("{=BLT_HearthDesc}Flat daily hearth bonus to this fief's villages"),
+         PropertyOrder(4), UsedImplicitly]
+        public float HearthDaily { get; set; } = 0f;
+
+        // ── Garrison Troop Spawning ───────────────────────────────────────────
+        [LocDisplayName("{=BLT_GarrisonSpawnDaily}Garrison Daily Troop Spawn"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning"),
+         LocDescription("{=BLT_GarrisonSpawnDailyDesc}Troops added to THIS settlement's garrison per day. Fractional values accumulate (e.g., 0.5 = 1 troop every 2 days). Requires the settlement to have a garrison party (towns/castles only)."),
+         PropertyOrder(1), UsedImplicitly, DefaultValue(0f)]
+        public float GarrisonDailyTroopSpawnAmount { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_GarrisonTroopTree}Garrison Troop Tree"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning"),
+         LocDescription("{=BLT_GarrisonTroopTreeDesc}Basic (tiers 1–5) or Noble (tiers 2–6) troop tree for garrison spawns."),
+         PropertyOrder(2), UsedImplicitly, DefaultValue(TroopTreeType.Basic)]
+        public TroopTreeType GarrisonTroopTree { get; set; } = TroopTreeType.Basic;
+
+        [LocDisplayName("{=BLT_GarrisonTroopTier}Garrison Troop Tier"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning"),
+         LocDescription("{=BLT_GarrisonTroopTierDesc}Base tier of troops added to garrison. Can be raised by other fief upgrades via 'Garrison Buffs Troop Tier Of'."),
+         PropertyOrder(3), UsedImplicitly, DefaultValue(1)]
+        public int GarrisonTroopTier { get; set; } = 1;
+
+        private string _garrisonBuffsTroopTierOf = "";
+        [LocDisplayName("{=BLT_GarrisonBuffsTierOf}Garrison Buffs Troop Tier Of (Upgrade ID(s))"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning"),
+         LocDescription("{=BLT_GarrisonBuffsTierOfDesc}Comma-separated fief upgrade ID(s) whose garrison troop tier this upgrade increases. Leave empty if this upgrade spawns troops itself."),
+         PropertyOrder(4), UsedImplicitly]
+        public string GarrisonBuffsTroopTierOf
+        {
+            get => _garrisonBuffsTroopTierOf;
+            set { if (_garrisonBuffsTroopTierOf != value) { _garrisonBuffsTroopTierOf = value; OnPropertyChanged(nameof(GarrisonBuffsTroopTierOf)); } }
+        }
+
+        [LocDisplayName("{=BLT_GarrisonTierBonus}Garrison Troop Tier Bonus"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning"),
+         LocDescription("{=BLT_GarrisonTierBonusDesc}How many tiers to add to the fief upgrades specified in 'Garrison Buffs Troop Tier Of'."),
+         PropertyOrder(5), UsedImplicitly, DefaultValue(0)]
+        public int GarrisonTroopTierBonus { get; set; } = 0;
+
+        public List<string> GarrisonBuffsTroopTierOfIDs
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(_garrisonBuffsTroopTierOf)) return new List<string>();
+                return _garrisonBuffsTroopTierOf.Split(',').Select(id => id.Trim()).Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+            }
+        }
+
+        public override string GetFullDescription()
+        {
+            string desc = base.GetFullDescription();
+            desc += "\n\nEffects:";
+            if (LoyaltyDailyFlat != 0) desc += $"\n  Loyalty: {(LoyaltyDailyFlat > 0 ? "+" : "")}{LoyaltyDailyFlat}/day";
+            if (LoyaltyDailyPercent != 0) desc += $"\n  Loyalty: {(LoyaltyDailyPercent > 0 ? "+" : "")}{LoyaltyDailyPercent}%/day";
+            if (ProsperityDailyFlat != 0) desc += $"\n  Prosperity: {(ProsperityDailyFlat > 0 ? "+" : "")}{ProsperityDailyFlat}/day";
+            if (ProsperityDailyPercent != 0) desc += $"\n  Prosperity: {(ProsperityDailyPercent > 0 ? "+" : "")}{ProsperityDailyPercent}%/day";
+            if (SecurityDailyFlat != 0) desc += $"\n  Security: {(SecurityDailyFlat > 0 ? "+" : "")}{SecurityDailyFlat}/day";
+            if (SecurityDailyPercent != 0) desc += $"\n  Security: {(SecurityDailyPercent > 0 ? "+" : "")}{SecurityDailyPercent}%/day";
+            if (MilitiaDailyFlat != 0) desc += $"\n  Militia: {(MilitiaDailyFlat > 0 ? "+" : "")}{MilitiaDailyFlat}/day";
+            if (MilitiaDailyPercent != 0) desc += $"\n  Militia: {(MilitiaDailyPercent > 0 ? "+" : "")}{MilitiaDailyPercent}%/day";
+            if (FoodDailyFlat != 0) desc += $"\n  Food: {(FoodDailyFlat > 0 ? "+" : "")}{FoodDailyFlat}/day";
+            if (FoodDailyPercent != 0) desc += $"\n  Food: {(FoodDailyPercent > 0 ? "+" : "")}{FoodDailyPercent}%/day";
+            if (TaxIncomeFlat != 0) desc += $"\n  Tax Income: {(TaxIncomeFlat > 0 ? "+" : "")}{TaxIncomeFlat}{Naming.Gold}/day";
+            if (TaxIncomePercent != 0) desc += $"\n  Tax Income: {(TaxIncomePercent > 0 ? "+" : "")}{TaxIncomePercent}%";
+            if (GarrisonCapacityBonus != 0) desc += $"\n  Garrison Capacity: {(GarrisonCapacityBonus > 0 ? "+" : "")}{GarrisonCapacityBonus}";
+            if (HearthDaily != 0) desc += $"\n  Hearth: {(HearthDaily > 0 ? "+" : "")}{HearthDaily}";
+            if (GarrisonDailyTroopSpawnAmount > 0 || GarrisonTroopTierBonus > 0)
+            {
+                desc += "\n\nGarrison Troop Spawning:";
+                if (GarrisonDailyTroopSpawnAmount > 0)
+                {
+                    desc += $"\n  Daily Garrison Spawn: {GarrisonDailyTroopSpawnAmount} troops/day";
+                    desc += $"\n  Troop Tree: {GarrisonTroopTree}";
+                    desc += $"\n  Base Tier: {GarrisonTroopTier}";
+                }
+                if (GarrisonTroopTierBonus > 0 && !string.IsNullOrEmpty(GarrisonBuffsTroopTierOf))
+                    desc += $"\n  Garrison Tier Bonus: +{GarrisonTroopTierBonus} to upgrades: {GarrisonBuffsTroopTierOf}";
+            }
+            return desc;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ClanUpgrade
+    // ─────────────────────────────────────────────────────────────────────────
+    [CategoryOrder("General", 0),
+     CategoryOrder("Clan Effects", 1),
+     CategoryOrder("Settlement Effects", 2),
+     CategoryOrder("Troop Spawning", 3),
+     CategoryOrder("Garrison Troop Spawning", 4)]
+    public class ClanUpgrade : UpgradeBase
+    {
+        [Browsable(false)]
+        public new bool CapitalOnly { get => false; set { } }
+        // ── Clan Effects ──────────────────────────────────────────────────────
+        [LocDisplayName("{=BLT_RenownDaily}Renown Daily"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_RenownDailyDesc}Renown gained per day for the clan"),
+         PropertyOrder(1), UsedImplicitly]
+        public float RenownDaily { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_InfluenceDaily}Influence Daily"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_InfluenceDailyDesc}Influence gained per day for this clan"),
+         PropertyOrder(2), UsedImplicitly]
+        public float InfluenceDaily { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_PartySize}Party Size Bonus"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_PartySizeDesc}Additional party size limit for all clan parties"),
+         PropertyOrder(3), UsedImplicitly]
+        public int PartySizeBonus { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_PartySpeed}Party Movement Speed Bonus"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_PartySpeedDesc}Additional flat movement speed for all clan parties"),
+         PropertyOrder(4), UsedImplicitly]
+        public float PartySpeedBonus { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_LordOnly}Lord Only Upgrade"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_LordOnlyDesc}Makes this upgrade only apply when the clan isnt a mercenary"),
+         PropertyOrder(5), UsedImplicitly, DefaultValue(false)]
+        public bool LordOnly { get; set; } = false;
+
+        [LocDisplayName("{=BLT_MercOnly}Mercenary Only Upgrade"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_MercOnlyDesc}Makes this upgrade only apply when the clan is a mercenary"),
+         PropertyOrder(6), UsedImplicitly, DefaultValue(false)]
+        public bool MercOnly { get; set; } = false;
+
+        [LocDisplayName("{=BLT_MercFlat}Merc Income (Flat)"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_MercFlatDesc}Flat daily gold bonus from clan's mercenary contract"),
+         PropertyOrder(7), UsedImplicitly, DefaultValue(0)]
+        public int MercIncomeFlat { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_MercPercent}Merc Income (Percent)"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_MercPercentDesc}Percent daily gold bonus from clan's mercenary contract"),
+         PropertyOrder(8), UsedImplicitly, DefaultValue(0)]
+        public float MercIncomePercent { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_PartyAmountBonus}Max Parties Bonus"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_PartyAmountBonusDesc}Increases the maximum amount of parties the upgraded clan can have at once"),
+         PropertyOrder(9), UsedImplicitly, DefaultValue(0)]
+        public int PartyAmountBonus { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_MaxVassalsBonus}Max Vassals Bonus"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_MaxVassalsBonusDesc}Increases the maximum amount of vassal clans the upgraded clan can have"),
+         PropertyOrder(10), UsedImplicitly, DefaultValue(0)]
+        public int MaxVassalsBonus { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_ApplyToVassals}Apply to Vassals (Under Development)"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_ApplyToVassalsDesc}(CURRENTLY DISABLED) Makes this upgrade apply to ALL vassal clans of the upgraded clan (Does not affect upgraded clan itself)"),
+         PropertyOrder(11), UsedImplicitly, DefaultValue(false)]
+        public bool ApplyToVassals { get; set; } = false;
+
+        [LocDisplayName("{=BLT_RetinueSizeBonus}Retinue Size Bonus"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription("{=BLT_RetinueSizeBonusDesc}Increases the maximum retinue size for all adopted heroes in this clan."),
+         PropertyOrder(12), UsedImplicitly, DefaultValue(0)]
+        public int RetinueSizeBonus { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_ArmySpeedBonus}Army Speed Bonus"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription(
+            "{=BLT_ArmySpeedBonusDesc}Flat movement-speed bonus contributed to any army this clan's parties participate in. " +
+            "Bonuses from all parties in the army are summed. " +
+            "This bonus is ONLY active while in an army; the regular Party Speed Bonus does not apply in armies."),
+         PropertyOrder(13), UsedImplicitly, DefaultValue(0f)]
+        public float ArmySpeedBonus { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_ArmySpeedOncePerClan}Army Speed Once Per Clan"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects"),
+         LocDescription(
+            "{=BLT_ArmySpeedOncePerClanDesc}When ON (recommended), this upgrade's army speed bonus is counted at most once per clan " +
+            "even if that clan has multiple parties in the army. " +
+            "When OFF, every individual party from this clan adds the bonus independently."),
+         PropertyOrder(14), UsedImplicitly, DefaultValue(false)]
+        public bool ArmySpeedOncePerClan { get; set; } = false;
+
+        // ── Settlement Effects ────────────────────────────────────────────────
+        [LocDisplayName("{=BLT_LoyaltyFlat}Loyalty Daily (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_LoyaltyFlatDesc}Flat loyalty gain per day for all clan settlements"),
+         PropertyOrder(1), UsedImplicitly]
+        public float LoyaltyDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_LoyaltyPercent}Loyalty Daily (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_LoyaltyPercentDesc}Percentage bonus to loyalty change per day for all clan settlements"),
+         PropertyOrder(2), UsedImplicitly]
+        public float LoyaltyDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_ProsperityFlat}Prosperity Daily (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_ProsperityFlatDesc}Flat prosperity gain per day for all clan settlements"),
+         PropertyOrder(3), UsedImplicitly]
+        public float ProsperityDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_ProsperityPercent}Prosperity Daily (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_ProsperityPercentDesc}Percentage bonus to prosperity change per day for all clan settlements"),
+         PropertyOrder(4), UsedImplicitly]
+        public float ProsperityDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_SecurityFlat}Security Daily (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_SecurityFlatDesc}Flat security gain per day for all clan settlements"),
+         PropertyOrder(5), UsedImplicitly]
+        public float SecurityDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_SecurityPercent}Security Daily (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_SecurityPercentDesc}Percentage bonus to security change per day for all clan settlements"),
+         PropertyOrder(6), UsedImplicitly]
+        public float SecurityDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_MilitiaFlat}Militia Daily (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_MilitiaFlatDesc}Flat militia gain per day for all clan settlements"),
+         PropertyOrder(7), UsedImplicitly]
+        public float MilitiaDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_MilitiaPercent}Militia Daily (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_MilitiaPercentDesc}Percentage bonus to militia change per day for all clan settlements"),
+         PropertyOrder(8), UsedImplicitly]
+        public float MilitiaDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_FoodFlat}Food Daily (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_FoodFlatDesc}Flat food stock gain per day for all clan settlements"),
+         PropertyOrder(9), UsedImplicitly]
+        public float FoodDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_FoodPercent}Food Daily (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_FoodPercentDesc}Percentage bonus to food change per day for all clan settlements"),
+         PropertyOrder(10), UsedImplicitly]
+        public float FoodDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_TaxFlat}Tax Income (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_TaxFlatDesc}Flat daily gold bonus from taxes for all clan settlements"),
+         PropertyOrder(11), UsedImplicitly]
+        public int TaxIncomeFlat { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_TaxPercent}Tax Income (%) (CURRENTLY DISABLED)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_TaxPercentDesc}Percentage bonus to tax income for all clan settlements"),
+         PropertyOrder(12), UsedImplicitly]
+        public float TaxIncomePercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_GarrisonCap}Garrison Capacity Bonus"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_GarrisonCapDesc}Additional garrison troop capacity (Warning: High values may cause issues)"),
+         PropertyOrder(13), UsedImplicitly]
+        public int GarrisonCapacityBonus { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_Hearth}Hearth Daily"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Clan Settlements)"),
+         LocDescription("{=BLT_HearthDesc}Flat daily hearth bonus to all clan villages"),
+         PropertyOrder(14), UsedImplicitly]
+        public float HearthDaily { get; set; } = 0f;
+
+        // ── Troop Spawning (party) ────────────────────────────────────────────
+        [LocDisplayName("{=BLT_TroopSpawnDaily}Daily Troop Spawn Amount"),
+         LocCategory("Troop Spawning", "{=BLT_TroopSpawning}Troop Spawning"),
+         LocDescription("{=BLT_TroopSpawnDailyDesc}Number of troops to spawn per day into war parties. Fractional values accumulate."),
+         PropertyOrder(1), UsedImplicitly, DefaultValue(0f)]
+        public float DailyTroopSpawnAmount { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_TroopTree}Troop Tree Type"),
+         LocCategory("Troop Spawning", "{=BLT_TroopSpawning}Troop Spawning"),
+         LocDescription("{=BLT_TroopTreeDesc}Whether to spawn from Basic (1-5) or Noble (2-6) troop tree."),
+         PropertyOrder(2), UsedImplicitly, DefaultValue(TroopTreeType.Basic)]
+        public TroopTreeType TroopTree { get; set; } = TroopTreeType.Basic;
+
+        [LocDisplayName("{=BLT_TroopTier}Troop Tier"),
+         LocCategory("Troop Spawning", "{=BLT_TroopSpawning}Troop Spawning"),
+         LocDescription("{=BLT_TroopTierDesc}Base tier of troops to spawn. Basic tree: 1-5, Noble tree: 2-6. Can be increased by other upgrades."),
+         PropertyOrder(3), UsedImplicitly, DefaultValue(1)]
+        public int TroopTier { get; set; } = 1;
+
+        private string _buffsTroopTierOf = "";
+        [LocDisplayName("{=BLT_BuffsTroopTierOf}Buffs Troop Tier Of (Upgrade ID(s))"),
+         LocCategory("Troop Spawning", "{=BLT_TroopSpawning}Troop Spawning"),
+         LocDescription("{=BLT_BuffsTroopTierOfDesc}Comma-separated clan upgrade ID(s) whose war-party troop tier this upgrade increases."),
+         PropertyOrder(4), UsedImplicitly]
+        public string BuffsTroopTierOf
+        {
+            get => _buffsTroopTierOf;
+            set { if (_buffsTroopTierOf != value) { _buffsTroopTierOf = value; OnPropertyChanged(nameof(BuffsTroopTierOf)); } }
+        }
+
+        [LocDisplayName("{=BLT_TroopTierBonus}Troop Tier Bonus"),
+         LocCategory("Troop Spawning", "{=BLT_TroopSpawning}Troop Spawning"),
+         LocDescription("{=BLT_TroopTierBonusDesc}How many tiers to add to the upgrades specified in 'Buffs Troop Tier Of'."),
+         PropertyOrder(5), UsedImplicitly, DefaultValue(0)]
+        public int TroopTierBonus { get; set; } = 0;
+
+        public List<string> BuffsTroopTierOfIDs
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(_buffsTroopTierOf)) return new List<string>();
+                return _buffsTroopTierOf.Split(',').Select(id => id.Trim()).Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+            }
+        }
+
+        // ── Garrison Troop Spawning ───────────────────────────────────────────
+        [LocDisplayName("{=BLT_GarrisonSpawnDaily}Garrison Daily Troop Spawn"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning"),
+         LocDescription("{=BLT_GarrisonSpawnDailyDesc}Troops added to a random clan settlement's garrison per day. Fractional values accumulate."),
+         PropertyOrder(1), UsedImplicitly, DefaultValue(0f)]
+        public float GarrisonDailyTroopSpawnAmount { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_GarrisonTroopTree}Garrison Troop Tree"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning"),
+         LocDescription("{=BLT_GarrisonTroopTreeDesc}Basic (tiers 1–5) or Noble (tiers 2–6) troop tree for garrison spawns."),
+         PropertyOrder(2), UsedImplicitly, DefaultValue(TroopTreeType.Basic)]
+        public TroopTreeType GarrisonTroopTree { get; set; } = TroopTreeType.Basic;
+
+        [LocDisplayName("{=BLT_GarrisonTroopTier}Garrison Troop Tier"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning"),
+         LocDescription("{=BLT_GarrisonTroopTierDesc}Base tier of troops added to garrison. Can be raised by other clan upgrades via 'Garrison Buffs Troop Tier Of'."),
+         PropertyOrder(3), UsedImplicitly, DefaultValue(1)]
+        public int GarrisonTroopTier { get; set; } = 1;
+
+        private string _garrisonBuffsTroopTierOf = "";
+        [LocDisplayName("{=BLT_GarrisonBuffsTierOf}Garrison Buffs Troop Tier Of (Upgrade ID(s))"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning"),
+         LocDescription("{=BLT_GarrisonBuffsTierOfDesc}Comma-separated clan upgrade ID(s) whose garrison troop tier this upgrade increases."),
+         PropertyOrder(4), UsedImplicitly]
+        public string GarrisonBuffsTroopTierOf
+        {
+            get => _garrisonBuffsTroopTierOf;
+            set { if (_garrisonBuffsTroopTierOf != value) { _garrisonBuffsTroopTierOf = value; OnPropertyChanged(nameof(GarrisonBuffsTroopTierOf)); } }
+        }
+
+        [LocDisplayName("{=BLT_GarrisonTierBonus}Garrison Troop Tier Bonus"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning"),
+         LocDescription("{=BLT_GarrisonTierBonusDesc}How many tiers to add to the clan upgrades specified in 'Garrison Buffs Troop Tier Of'."),
+         PropertyOrder(5), UsedImplicitly, DefaultValue(0)]
+        public int GarrisonTroopTierBonus { get; set; } = 0;
+
+        public List<string> GarrisonBuffsTroopTierOfIDs
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(_garrisonBuffsTroopTierOf)) return new List<string>();
+                return _garrisonBuffsTroopTierOf.Split(',').Select(id => id.Trim()).Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+            }
+        }
+
+        public override string GetFullDescription()
+        {
+            string desc = base.GetFullDescription();
+            desc += "\n\nClan Effects:";
+            if (LordOnly) desc += $"\n  Lord Only: {LordOnly}";
+            if (MercOnly) desc += $"\n  Mercenary Only: {MercOnly}";
+            if (ApplyToVassals) desc += $"\n  Apply to (only) Vassals: {ApplyToVassals}";
+            if (RenownDaily != 0) desc += $"\n  Renown: {(RenownDaily > 0 ? "+" : "")}{RenownDaily}/day";
+            if (InfluenceDaily != 0) desc += $"\n  Influence: {(InfluenceDaily > 0 ? "+" : "")}{InfluenceDaily}/day";
+            if (PartySizeBonus != 0) desc += $"\n  Party Size: {(PartySizeBonus > 0 ? "+" : "")}{PartySizeBonus}";
+            if (PartySpeedBonus != 0) desc += $"\n  Party Speed: {(PartySpeedBonus > 0 ? "+" : "")}{PartySpeedBonus}";
+            if (PartyAmountBonus != 0) desc += $"\n  Party Limit: {(PartyAmountBonus > 0 ? "+" : "")}{PartyAmountBonus}";
+            if (MaxVassalsBonus != 0) desc += $"\n  Vassal Limit: {(MaxVassalsBonus > 0 ? "+" : "")}{MaxVassalsBonus}";
+            if (RetinueSizeBonus != 0) desc += $"\n  Retinue Size: {(RetinueSizeBonus > 0 ? "+" : "")}{RetinueSizeBonus}";
+            //if (Retinue2SizeBonus != 0) desc += $"\n  Secondary Retinue Size: {(Retinue2SizeBonus > 0 ? "+" : "")}{Retinue2SizeBonus}";
+            if (MercIncomeFlat != 0) desc += $"\n  Flat Income Bonus: {(MercIncomeFlat > 0 ? "+" : "")}{MercIncomeFlat}/day";
+            if (MercIncomePercent != 0) desc += $"\n  Percent Income Bonus: {(MercIncomePercent > 0 ? "+" : "")}{MercIncomePercent}%/day";
+            if (ArmySpeedBonus != 0) desc += $"\n  Army Speed: {(ArmySpeedBonus > 0 ? "+" : "")}{ArmySpeedBonus}" +
+                                          $" {(ArmySpeedOncePerClan ? $"once/clan: {ArmySpeedOncePerClan}" : "")}";
+
+            bool hasSfx = LoyaltyDailyFlat != 0 || LoyaltyDailyPercent != 0 || ProsperityDailyFlat != 0 || ProsperityDailyPercent != 0 ||
+                SecurityDailyFlat != 0 || SecurityDailyPercent != 0 || MilitiaDailyFlat != 0 || MilitiaDailyPercent != 0 ||
+                FoodDailyFlat != 0 || FoodDailyPercent != 0 || TaxIncomeFlat != 0 || TaxIncomePercent != 0 || GarrisonCapacityBonus != 0 || HearthDaily != 0;
+            if (hasSfx) desc += "\n\nSettlement Effects (All Clan Settlements):";
+            if (LoyaltyDailyFlat != 0) desc += $"\n  Loyalty: {(LoyaltyDailyFlat > 0 ? "+" : "")}{LoyaltyDailyFlat}/day";
+            if (LoyaltyDailyPercent != 0) desc += $"\n  Loyalty: {(LoyaltyDailyPercent > 0 ? "+" : "")}{LoyaltyDailyPercent}%/day";
+            if (ProsperityDailyFlat != 0) desc += $"\n  Prosperity: {(ProsperityDailyFlat > 0 ? "+" : "")}{ProsperityDailyFlat}/day";
+            if (ProsperityDailyPercent != 0) desc += $"\n  Prosperity: {(ProsperityDailyPercent > 0 ? "+" : "")}{ProsperityDailyPercent}%/day";
+            if (SecurityDailyFlat != 0) desc += $"\n  Security: {(SecurityDailyFlat > 0 ? "+" : "")}{SecurityDailyFlat}/day";
+            if (SecurityDailyPercent != 0) desc += $"\n  Security: {(SecurityDailyPercent > 0 ? "+" : "")}{SecurityDailyPercent}%/day";
+            if (MilitiaDailyFlat != 0) desc += $"\n  Militia: {(MilitiaDailyFlat > 0 ? "+" : "")}{MilitiaDailyFlat}/day";
+            if (MilitiaDailyPercent != 0) desc += $"\n  Militia: {(MilitiaDailyPercent > 0 ? "+" : "")}{MilitiaDailyPercent}%/day";
+            if (FoodDailyFlat != 0) desc += $"\n  Food: {(FoodDailyFlat > 0 ? "+" : "")}{FoodDailyFlat}/day";
+            if (FoodDailyPercent != 0) desc += $"\n  Food: {(FoodDailyPercent > 0 ? "+" : "")}{FoodDailyPercent}%/day";
+            if (TaxIncomeFlat != 0) desc += $"\n  Tax Income: {(TaxIncomeFlat > 0 ? "+" : "")}{TaxIncomeFlat}{Naming.Gold}/day per settlement";
+            if (TaxIncomePercent != 0) desc += $"\n  Tax Income: {(TaxIncomePercent > 0 ? "+" : "")}{TaxIncomePercent}%";
+            if (GarrisonCapacityBonus != 0) desc += $"\n  Garrison Capacity: {(GarrisonCapacityBonus > 0 ? "+" : "")}{GarrisonCapacityBonus}";
+            if (HearthDaily != 0) desc += $"\n  Hearth: {(HearthDaily > 0 ? "+" : "")}{HearthDaily}";
+
+            if (DailyTroopSpawnAmount > 0 || TroopTierBonus > 0)
+            {
+                desc += "\n\nTroop Spawning (War Parties):";
+                if (DailyTroopSpawnAmount > 0)
+                {
+                    desc += $"\n  Daily Spawn: {DailyTroopSpawnAmount} troops/day";
+                    desc += $"\n  Troop Tree: {TroopTree}";
+                    desc += $"\n  Base Tier: {TroopTier}";
+                }
+                if (TroopTierBonus > 0 && !string.IsNullOrEmpty(BuffsTroopTierOf))
+                    desc += $"\n  Tier Bonus: +{TroopTierBonus} to upgrades: {BuffsTroopTierOf}";
+            }
+
+            if (GarrisonDailyTroopSpawnAmount > 0 || GarrisonTroopTierBonus > 0)
+            {
+                desc += "\n\nGarrison Troop Spawning:";
+                if (GarrisonDailyTroopSpawnAmount > 0)
+                {
+                    desc += $"\n  Daily Garrison Spawn: {GarrisonDailyTroopSpawnAmount} troops/day (random clan settlement)";
+                    desc += $"\n  Troop Tree: {GarrisonTroopTree}";
+                    desc += $"\n  Base Tier: {GarrisonTroopTier}";
+                }
+                if (GarrisonTroopTierBonus > 0 && !string.IsNullOrEmpty(GarrisonBuffsTroopTierOf))
+                    desc += $"\n  Garrison Tier Bonus: +{GarrisonTroopTierBonus} to upgrades: {GarrisonBuffsTroopTierOf}";
+            }
+            return desc;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // KingdomUpgrade
+    // ─────────────────────────────────────────────────────────────────────────
+    [CategoryOrder("General", 0),
+     CategoryOrder("Kingdom Effects", 1),
+     CategoryOrder("Clan Effects", 2),
+     CategoryOrder("Settlement Effects", 3),
+     CategoryOrder("Troop Spawning", 4),
+     CategoryOrder("Garrison Troop Spawning", 5)]
+    public class KingdomUpgrade : UpgradeBase
+    {
+        [Browsable(false)]
+        public new bool CapitalOnly { get => false; set { } }
+
+        [LocDisplayName("{=BLT_InfluenceCost}Influence Cost"),
+         LocCategory("General", "{=BLT_General}General"),
+         LocDescription("{=BLT_InfluenceCostDesc}Cost in influence to purchase this upgrade (in addition to gold)"),
+         PropertyOrder(100), UsedImplicitly]
+        public int InfluenceCost { get; set; } = 0;
+
+        // ── Kingdom Effects ───────────────────────────────────────────────────
+        [LocDisplayName("{=BLT_InfluenceDaily}Influence Daily (All Clans)"),
+         LocCategory("Kingdom Effects", "{=BLT_KingdomEffects}Kingdom Effects"),
+         LocDescription("{=BLT_InfluenceDailyDesc}Influence gained per day for ALL clans in the kingdom"),
+         PropertyOrder(1), UsedImplicitly]
+        public float InfluenceDaily { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_MaxClansBonus}Max Clans Bonus"),
+         LocCategory("Kingdom Effects", "{=BLT_KingdomEffects}Kingdom Effects"),
+         LocDescription("{=BLT_MaxClansBonusDesc}Additional maximum clans your kingdom can have"),
+         PropertyOrder(2), UsedImplicitly, DefaultValue(0)]
+        public int MaxClansBonus { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_MaxMercClansBonus}Max Mercenary Clans Bonus"),
+         LocCategory("Kingdom Effects", "{=BLT_KingdomEffects}Kingdom Effects"),
+         LocDescription("{=BLT_MaxMercClansBonusDesc}Additional maximum mercenary clans your kingdom can have"),
+         PropertyOrder(3), UsedImplicitly, DefaultValue(0)]
+        public int MaxMercClansBonus { get; set; } = 0;
+
+        // ── Clan Effects ──────────────────────────────────────────────────────
+        [LocDisplayName("{=BLT_RenownDaily}Renown Daily"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects (All Kingdom Clans)"),
+         LocDescription("{=BLT_RenownDailyDesc}Renown gained per day for all clans in the kingdom"),
+         PropertyOrder(1), UsedImplicitly]
+        public float RenownDaily { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_PartySize}Party Size Bonus"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects (All Kingdom Clans)"),
+         LocDescription("{=BLT_PartySizeDesc}Additional party size limit for all kingdom parties"),
+         PropertyOrder(2), UsedImplicitly]
+        public int PartySizeBonus { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_PartySpeed}Party Speed Bonus"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects (All Kingdom Clans)"),
+         LocDescription("{=BLT_PartySpeedDesc}Additional flat party speed for all kingdom parties"),
+         PropertyOrder(3), UsedImplicitly]
+        public float PartySpeedBonus { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_RetinueSizeBonus}Retinue Size Bonus"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects (All Kingdom Clans)"),
+         LocDescription("{=BLT_RetinueSizeBonusDesc}Increases the maximum retinue size for all adopted heroes across all clans in the kingdom."),
+         PropertyOrder(4), UsedImplicitly, DefaultValue(0)]
+        public int RetinueSizeBonus { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_ArmySpeedBonus}Army Speed Bonus"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects (All Kingdom Clans)"),
+         LocDescription(
+            "{=BLT_ArmySpeedBonusDesc}Flat movement-speed bonus contributed once per kingdom clan that is present in an army. " +
+            "Accumulates across every kingdom clan in the army. " +
+            "This bonus is ONLY active while in an army; the regular Party Speed Bonus does not apply in armies."),
+         PropertyOrder(5), UsedImplicitly, DefaultValue(0f)]
+        public float ArmySpeedBonus { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_ArmySpeedOncePerClan}Army Speed Once Per Clan"),
+         LocCategory("Clan Effects", "{=BLT_ClanEffects}Clan Effects (All Kingdom Clans)"),
+         LocDescription(
+            "{=BLT_ArmySpeedOncePerClanDesc}When ON (recommended), each kingdom clan contributes this bonus at most once to the army " +
+            "regardless of how many parties that clan has present. " +
+            "When OFF, every individual party from any kingdom clan adds the bonus independently."),
+         PropertyOrder(6), UsedImplicitly, DefaultValue(true)]
+        public bool ArmySpeedOncePerClan { get; set; } = true;
+
+        // ── Settlement Effects ────────────────────────────────────────────────
+        [LocDisplayName("{=BLT_LoyaltyFlat}Loyalty Daily (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_LoyaltyFlatDesc}Flat loyalty gain per day for all kingdom settlements"),
+         PropertyOrder(1), UsedImplicitly]
+        public float LoyaltyDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_LoyaltyPercent}Loyalty Daily (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_LoyaltyPercentDesc}Percentage bonus to loyalty change per day for all kingdom settlements"),
+         PropertyOrder(2), UsedImplicitly]
+        public float LoyaltyDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_ProsperityFlat}Prosperity Daily (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_ProsperityFlatDesc}Flat prosperity gain per day for all kingdom settlements"),
+         PropertyOrder(3), UsedImplicitly]
+        public float ProsperityDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_ProsperityPercent}Prosperity Daily (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_ProsperityPercentDesc}Percentage bonus to prosperity change per day for all kingdom settlements"),
+         PropertyOrder(4), UsedImplicitly]
+        public float ProsperityDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_SecurityFlat}Security Daily (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_SecurityFlatDesc}Flat security gain per day for all kingdom settlements"),
+         PropertyOrder(5), UsedImplicitly]
+        public float SecurityDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_SecurityPercent}Security Daily (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_SecurityPercentDesc}Percentage bonus to security change per day for all kingdom settlements"),
+         PropertyOrder(6), UsedImplicitly]
+        public float SecurityDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_MilitiaFlat}Militia Daily (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_MilitiaFlatDesc}Flat militia gain per day for all kingdom settlements"),
+         PropertyOrder(7), UsedImplicitly]
+        public float MilitiaDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_MilitiaPercent}Militia Daily (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_MilitiaPercentDesc}Percentage bonus to militia change per day for all kingdom settlements"),
+         PropertyOrder(8), UsedImplicitly]
+        public float MilitiaDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_FoodFlat}Food Daily (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_FoodFlatDesc}Flat food stock gain per day for all kingdom settlements"),
+         PropertyOrder(9), UsedImplicitly]
+        public float FoodDailyFlat { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_FoodPercent}Food Daily (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_FoodPercentDesc}Percentage bonus to food change per day for all kingdom settlements"),
+         PropertyOrder(10), UsedImplicitly]
+        public float FoodDailyPercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_TaxFlat}Tax Income (Flat)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_TaxFlatDesc}Flat daily gold bonus from taxes for all kingdom settlements"),
+         PropertyOrder(11), UsedImplicitly]
+        public int TaxIncomeFlat { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_TaxPercent}Tax Income (%)"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_TaxPercentDesc}Percentage bonus to tax income for all kingdom settlements"),
+         PropertyOrder(12), UsedImplicitly]
+        public float TaxIncomePercent { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_GarrisonCap}Garrison Capacity Bonus"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_GarrisonCapDesc}Additional garrison troop capacity (Warning: High values may cause issues)"),
+         PropertyOrder(13), UsedImplicitly]
+        public int GarrisonCapacityBonus { get; set; } = 0;
+
+        [LocDisplayName("{=BLT_Hearth}Hearth Daily"),
+         LocCategory("Settlement Effects", "{=BLT_SettlementEffects}Settlement Effects (All Kingdom Settlements)"),
+         LocDescription("{=BLT_HearthDesc}Flat daily hearth bonus to all kingdom villages"),
+         PropertyOrder(14), UsedImplicitly]
+        public float HearthDaily { get; set; } = 0f;
+
+        // ── Troop Spawning (party) ────────────────────────────────────────────
+        [LocDisplayName("{=BLT_TroopSpawnDaily}Daily Troop Spawn Amount"),
+         LocCategory("Troop Spawning", "{=BLT_TroopSpawning}Troop Spawning (All Kingdom Clans)"),
+         LocDescription("{=BLT_TroopSpawnDailyDesc}Number of troops to spawn per day into war parties for EVERY clan in the kingdom. Fractional values accumulate."),
+         PropertyOrder(1), UsedImplicitly, DefaultValue(0f)]
+        public float DailyTroopSpawnAmount { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_TroopTree}Troop Tree Type"),
+         LocCategory("Troop Spawning", "{=BLT_TroopSpawning}Troop Spawning (All Kingdom Clans)"),
+         LocDescription("{=BLT_TroopTreeDesc}Whether to spawn from Basic (1-5) or Noble (2-6) troop tree."),
+         PropertyOrder(2), UsedImplicitly, DefaultValue(TroopTreeType.Basic)]
+        public TroopTreeType TroopTree { get; set; } = TroopTreeType.Basic;
+
+        [LocDisplayName("{=BLT_TroopTier}Troop Tier"),
+         LocCategory("Troop Spawning", "{=BLT_TroopSpawning}Troop Spawning (All Kingdom Clans)"),
+         LocDescription("{=BLT_TroopTierDesc}Base tier of troops to spawn. Basic tree: 1-5, Noble tree: 2-6."),
+         PropertyOrder(3), UsedImplicitly, DefaultValue(1)]
+        public int TroopTier { get; set; } = 1;
+
+        private string _buffsTroopTierOf = "";
+        [LocDisplayName("{=BLT_BuffsTroopTierOf}Buffs Troop Tier Of (Upgrade ID(s))"),
+         LocCategory("Troop Spawning", "{=BLT_TroopSpawning}Troop Spawning (All Kingdom Clans)"),
+         LocDescription("{=BLT_BuffsTroopTierOfDesc}Comma-separated kingdom upgrade ID(s) whose war-party troop tier this upgrade increases."),
+         PropertyOrder(4), UsedImplicitly]
+        public string BuffsTroopTierOf
+        {
+            get => _buffsTroopTierOf;
+            set { if (_buffsTroopTierOf != value) { _buffsTroopTierOf = value; OnPropertyChanged(nameof(BuffsTroopTierOf)); } }
+        }
+
+        [LocDisplayName("{=BLT_TroopTierBonus}Troop Tier Bonus"),
+         LocCategory("Troop Spawning", "{=BLT_TroopSpawning}Troop Spawning (All Kingdom Clans)"),
+         LocDescription("{=BLT_TroopTierBonusDesc}How many tiers to add to the upgrades specified in 'Buffs Troop Tier Of'."),
+         PropertyOrder(5), UsedImplicitly, DefaultValue(0)]
+        public int TroopTierBonus { get; set; } = 0;
+
+        public List<string> BuffsTroopTierOfIDs
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(_buffsTroopTierOf)) return new List<string>();
+                return _buffsTroopTierOf.Split(',').Select(id => id.Trim()).Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+            }
+        }
+
+        // ── Garrison Troop Spawning ───────────────────────────────────────────
+        [LocDisplayName("{=BLT_GarrisonSpawnDaily}Garrison Daily Troop Spawn"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning (All Kingdom Clans)"),
+         LocDescription("{=BLT_GarrisonSpawnDailyDesc}Troops added to a random settlement garrison per clan per day. Each clan in the kingdom processes this independently."),
+         PropertyOrder(1), UsedImplicitly, DefaultValue(0f)]
+        public float GarrisonDailyTroopSpawnAmount { get; set; } = 0f;
+
+        [LocDisplayName("{=BLT_GarrisonTroopTree}Garrison Troop Tree"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning (All Kingdom Clans)"),
+         LocDescription("{=BLT_GarrisonTroopTreeDesc}Basic (tiers 1–5) or Noble (tiers 2–6) troop tree for garrison spawns."),
+         PropertyOrder(2), UsedImplicitly, DefaultValue(TroopTreeType.Basic)]
+        public TroopTreeType GarrisonTroopTree { get; set; } = TroopTreeType.Basic;
+
+        [LocDisplayName("{=BLT_GarrisonTroopTier}Garrison Troop Tier"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning (All Kingdom Clans)"),
+         LocDescription("{=BLT_GarrisonTroopTierDesc}Base tier of troops added to garrison. Can be raised by other kingdom upgrades via 'Garrison Buffs Troop Tier Of'."),
+         PropertyOrder(3), UsedImplicitly, DefaultValue(1)]
+        public int GarrisonTroopTier { get; set; } = 1;
+
+        private string _garrisonBuffsTroopTierOf = "";
+        [LocDisplayName("{=BLT_GarrisonBuffsTierOf}Garrison Buffs Troop Tier Of (Upgrade ID(s))"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning (All Kingdom Clans)"),
+         LocDescription("{=BLT_GarrisonBuffsTierOfDesc}Comma-separated kingdom upgrade ID(s) whose garrison troop tier this upgrade increases."),
+         PropertyOrder(4), UsedImplicitly]
+        public string GarrisonBuffsTroopTierOf
+        {
+            get => _garrisonBuffsTroopTierOf;
+            set { if (_garrisonBuffsTroopTierOf != value) { _garrisonBuffsTroopTierOf = value; OnPropertyChanged(nameof(GarrisonBuffsTroopTierOf)); } }
+        }
+
+        [LocDisplayName("{=BLT_GarrisonTierBonus}Garrison Troop Tier Bonus"),
+         LocCategory("Garrison Troop Spawning", "{=BLT_GarrisonSpawning}Garrison Troop Spawning (All Kingdom Clans)"),
+         LocDescription("{=BLT_GarrisonTierBonusDesc}How many tiers to add to the kingdom upgrades specified in 'Garrison Buffs Troop Tier Of'."),
+         PropertyOrder(5), UsedImplicitly, DefaultValue(0)]
+        public int GarrisonTroopTierBonus { get; set; } = 0;
+
+        public List<string> GarrisonBuffsTroopTierOfIDs
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(_garrisonBuffsTroopTierOf)) return new List<string>();
+                return _garrisonBuffsTroopTierOf.Split(',').Select(id => id.Trim()).Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+            }
+        }
+
+        public override string GetCostString()
+        {
+            string cost = $"{GoldCost}{Naming.Gold}";
+            if (InfluenceCost > 0) cost += $" + {InfluenceCost} Influence";
+            return cost;
+        }
+
+        public override string GetFullDescription()
+        {
+            string desc = base.GetFullDescription();
+
+            desc += "\n\nKingdom Effects:";
+            if (InfluenceDaily != 0) desc += $"\n  Influence: {(InfluenceDaily > 0 ? "+" : "")}{InfluenceDaily}/day (all clans)";
+            if (MaxClansBonus != 0) desc += $"\n  Max Clans: {(MaxClansBonus > 0 ? "+" : "")}{MaxClansBonus}";
+            if (MaxMercClansBonus != 0) desc += $"\n  Max Mercenary Clans: {(MaxMercClansBonus > 0 ? "+" : "")}{MaxMercClansBonus}";
+
+            desc += "\n\nClan Effects (All Kingdom Clans):";
+            if (RenownDaily != 0) desc += $"\n  Renown: {(RenownDaily > 0 ? "+" : "")}{RenownDaily}/day per clan";
+            if (PartySizeBonus != 0) desc += $"\n  Party Size: {(PartySizeBonus > 0 ? "+" : "")}{PartySizeBonus}";
+            if (PartySpeedBonus != 0) desc += $"\n  Party Speed: {(PartySpeedBonus > 0 ? "+" : "")}{PartySpeedBonus}";
+            if (RetinueSizeBonus != 0) desc += $"\n  Retinue Size: {(RetinueSizeBonus > 0 ? "+" : "")}{RetinueSizeBonus} per clan";
+            if (ArmySpeedBonus != 0) desc += $"\n  Army Speed: {(ArmySpeedBonus > 0 ? "+" : "")}{ArmySpeedBonus}" +
+                                          $" {(ArmySpeedOncePerClan ? $"once/clan: {ArmySpeedOncePerClan}" : "")}";
+
+            desc += "\n\nSettlement Effects (All Kingdom Settlements):";
+            if (LoyaltyDailyFlat != 0) desc += $"\n  Loyalty: {(LoyaltyDailyFlat > 0 ? "+" : "")}{LoyaltyDailyFlat}/day";
+            if (LoyaltyDailyPercent != 0) desc += $"\n  Loyalty: {(LoyaltyDailyPercent > 0 ? "+" : "")}{LoyaltyDailyPercent}%/day";
+            if (ProsperityDailyFlat != 0) desc += $"\n  Prosperity: {(ProsperityDailyFlat > 0 ? "+" : "")}{ProsperityDailyFlat}/day";
+            if (ProsperityDailyPercent != 0) desc += $"\n  Prosperity: {(ProsperityDailyPercent > 0 ? "+" : "")}{ProsperityDailyPercent}%/day";
+            if (SecurityDailyFlat != 0) desc += $"\n  Security: {(SecurityDailyFlat > 0 ? "+" : "")}{SecurityDailyFlat}/day";
+            if (SecurityDailyPercent != 0) desc += $"\n  Security: {(SecurityDailyPercent > 0 ? "+" : "")}{SecurityDailyPercent}%/day";
+            if (MilitiaDailyFlat != 0) desc += $"\n  Militia: {(MilitiaDailyFlat > 0 ? "+" : "")}{MilitiaDailyFlat}/day";
+            if (MilitiaDailyPercent != 0) desc += $"\n  Militia: {(MilitiaDailyPercent > 0 ? "+" : "")}{MilitiaDailyPercent}%/day";
+            if (FoodDailyFlat != 0) desc += $"\n  Food: {(FoodDailyFlat > 0 ? "+" : "")}{FoodDailyFlat}/day";
+            if (FoodDailyPercent != 0) desc += $"\n  Food: {(FoodDailyPercent > 0 ? "+" : "")}{FoodDailyPercent}%/day";
+            if (TaxIncomeFlat != 0) desc += $"\n  Tax Income: {(TaxIncomeFlat > 0 ? "+" : "")}{TaxIncomeFlat}{Naming.Gold}/day per settlement";
+            if (TaxIncomePercent != 0) desc += $"\n  Tax Income: {(TaxIncomePercent > 0 ? "+" : "")}{TaxIncomePercent}%";
+            if (GarrisonCapacityBonus != 0) desc += $"\n  Garrison Capacity: {(GarrisonCapacityBonus > 0 ? "+" : "")}{GarrisonCapacityBonus}";
+            if (HearthDaily != 0) desc += $"\n  Hearth: {(HearthDaily > 0 ? "+" : "")}{HearthDaily}";
+
+            if (DailyTroopSpawnAmount > 0 || TroopTierBonus > 0)
+            {
+                desc += "\n\nTroop Spawning (War Parties, All Kingdom Clans):";
+                if (DailyTroopSpawnAmount > 0)
+                {
+                    desc += $"\n  Daily Spawn: {DailyTroopSpawnAmount} troops/day per clan";
+                    desc += $"\n  Troop Tree: {TroopTree}";
+                    desc += $"\n  Base Tier: {TroopTier}";
+                }
+                if (TroopTierBonus > 0 && !string.IsNullOrEmpty(BuffsTroopTierOf))
+                    desc += $"\n  Tier Bonus: +{TroopTierBonus} to kingdom upgrades: {BuffsTroopTierOf}";
+            }
+
+            if (GarrisonDailyTroopSpawnAmount > 0 || GarrisonTroopTierBonus > 0)
+            {
+                desc += "\n\nGarrison Troop Spawning (All Kingdom Clans):";
+                if (GarrisonDailyTroopSpawnAmount > 0)
+                {
+                    desc += $"\n  Daily Garrison Spawn: {GarrisonDailyTroopSpawnAmount} troops/day per clan (random clan settlement)";
+                    desc += $"\n  Troop Tree: {GarrisonTroopTree}";
+                    desc += $"\n  Base Tier: {GarrisonTroopTier}";
+                }
+                if (GarrisonTroopTierBonus > 0 && !string.IsNullOrEmpty(GarrisonBuffsTroopTierOf))
+                    desc += $"\n  Garrison Tier Bonus: +{GarrisonTroopTierBonus} to kingdom upgrades: {GarrisonBuffsTroopTierOf}";
+            }
+            return desc;
+        }
+    }
+}

@@ -1,0 +1,334 @@
+﻿<Window x:Class="BLTConfigure.BLTConfigureWindow"
+              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+              xmlns:local="clr-namespace:BLTConfigure"
+              xmlns:fa="http://schemas.fontawesome.io/icons/"
+              xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
+              xmlns:bannerlordTwitch="clr-namespace:BannerlordTwitch;assembly=BannerlordTwitch"
+              xmlns:utils="clr-namespace:BLTConfigure.Utils"
+              xmlns:ui="clr-namespace:BannerlordTwitch.UI;assembly=BannerlordTwitch"
+              xmlns:ui1="clr-namespace:BLTConfigure.UI"
+              mc:Ignorable="d"
+              ResizeMode="CanResize"
+              Title="BLT Configure Window" Width="1250" Height="1000" Background="LightGray"
+              d:DataContext="{d:DesignInstance local:BLTConfigureWindow}">
+    <!-- <Window.Resources> -->
+    <!--     <Style TargetType="{x:Type ui:CollectionPropertyEditor}"> -->
+    <!--         <EventSetter Event="OpenCollectionEditor" Handler="CollectionPropertyEditor_OpenCollectionEditor"></EventSetter> -->
+    <!--     </Style> -->
+    <!-- </Window.Resources> -->
+    <DockPanel LastChildFill="True" Background="LightGray">
+        <DockPanel.Resources>
+            <Style TargetType="TextBlock">
+                <Setter Property="Margin" Value="2" />
+                <Setter Property="Padding" Value="2" />
+                <!-- <Setter Property="FontSize" Value="14" /> -->
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+            <Style TargetType="Button">
+                <Setter Property="Margin" Value="5" />
+                <Setter Property="Padding" Value="6 4" />
+                <!-- <Setter Property="FontSize" Value="14" /> -->
+            </Style>
+            <Style TargetType="xctk:DropDownButton">
+                <Setter Property="Margin" Value="5" />
+                <Setter Property="Padding" Value="6 4" />
+                <!-- <Setter Property="FontSize" Value="14" /> -->
+            </Style>
+            <Style TargetType="ListBox">
+                <Setter Property="Margin" Value="5" />
+                <Setter Property="Padding" Value="5" />
+            </Style>
+            <Style TargetType="TabItem">
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="Padding" Value="5" />
+            </Style>
+        </DockPanel.Resources>
+        <TabControl Name="TabControl" SelectedIndex="0" Background="LightGray" >
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Margin="10 2">Configuration</TextBlock>
+                </TabItem.Header>
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top" HorizontalAlignment="Center">
+                        <Hyperlink RequestNavigate="Hyperlink_RequestNavigate" 
+                                   NavigateUri="https://discord.gg/AnStVFb2jG">Discord</Hyperlink> | 
+                        <Hyperlink RequestNavigate="Hyperlink_RequestNavigate" 
+                                   NavigateUri="https://github.com/jazz-ttv/Bannerlord-Twitch">GitHub</Hyperlink>
+                    </TextBlock>
+                    <Frame HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                           HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                           NavigationUIVisibility="Hidden"
+                           Navigating="ConfigurationFrame_OnNavigating"
+                           x:Name="ConfigurationFrame"/>
+                </DockPanel>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Margin="10 2">Overlay</TextBlock>
+                </TabItem.Header>
+                <StackPanel>
+                    <StackPanel.Resources>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Margin" Value="15 5"></Setter>
+                        </Style>
+                    </StackPanel.Resources>
+                    <TextBlock TextWrapping="Wrap" FontSize="20">
+                        The BLT Overlay is now provided as a browser source. When you run the game for the first time
+                        it should request authorization to reserve the port required, after which you can use the overlay.
+                    </TextBlock>
+                    <Separator Height="20"></Separator>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock TextWrapping="Wrap" FontSize="20">
+                            Overlay Url: 
+                            <Hyperlink RequestNavigate="Hyperlink_RequestNavigate" 
+                                       NavigateUri="{Binding OverlayUrl, Mode=OneWay}">
+                                <Run Text="{Binding OverlayUrl, Mode=OneWay}"/>
+                            </Hyperlink>
+                        </TextBlock>
+                        <Button Click="CopyOverlayUrlButton_OnClick" Margin="20 0" VerticalAlignment="Center">Copy to clipboard</Button>
+                    </StackPanel>
+                    <Separator Height="20"></Separator>
+                    <TextBlock TextWrapping="Wrap">
+                        <Bold>How to use the overlay:</Bold> <LineBreak/>
+                        <Bold>1.</Bold> Add a Browser Source in OBS (other streaming software should have a similar thing) <LineBreak/>
+                        <Bold>2.</Bold> Copy the Url from above and enter it where indicated<LineBreak/>
+                        <Bold>3.</Bold> Check <Italic>Refresh browser when scene becomes active</Italic><LineBreak/>
+                        <Bold>4.</Bold> A size of something like 400 width and 800 height is appropriate.
+                    </TextBlock>
+                    <TextBlock TextWrapping="Wrap">
+                        You should try to avoid stretching the overlay if you can help it, as it will look blurry. You
+                        can reset it to its true size by right clicking the source, going to <Italic>Transform</Italic> and then 
+                        <Italic>Reset Transform</Italic> (shortcut is Ctrl+R in OBS)
+                    </TextBlock>
+                    <TextBlock TextWrapping="Wrap">
+                        If you want to make it appear larger or smaller you should add 
+                        <Run FontFamily="Courier New">font-size: 170%</Run> (or whatever % you require, the default is 150%) to the Custom CSS, 
+                        so it will look something like:
+                    </TextBlock>
+                    <TextBlock TextWrapping="Wrap" FontFamily="Courier New" Margin="20 0" FontSize="14">
+                        body { background-color: rgba(0, 0, 0, 0); overflow: hidden; font-size: 170% }
+                    </TextBlock>
+                    <TextBlock TextWrapping="Wrap">
+                        <Run FontFamily="Courier New">font-size</Run> will actually apply scaling to everything in the overlay, not just the font.
+                    </TextBlock>
+                    <Separator Height="20"></Separator>
+                    <TextBlock TextWrapping="Wrap">
+                        The overlay will attempt to reconnect if you close and restart the game within a short period of time (6 hours). If you start OBS before you run the game, then you will need to refresh the browser source once you do run the game (there is a button for it in OBS, when you have the browser source selected). Alternatively you can switch scenes to refresh it.
+                    </TextBlock>
+                    <TextBlock TextWrapping="Wrap">
+                        The overlay should work from any computer on your network, as well as the one the game
+                        is running on.
+                    </TextBlock>
+                </StackPanel>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Margin="10 2">Documentation</TextBlock>
+                </TabItem.Header>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" FontSize="16" >
+                        On this tab you can automatically generate documentation for your custom BLT config settings. 
+                        It is generated as a webpage, including a html file, css file, and a set of images.
+                    </TextBlock>
+                    <Separator Grid.Row="1" Height="20"/>
+                    <ScrollViewer Grid.Row="4">
+                        <StackPanel>
+                            <TextBlock>
+                                You have various options for how to distribute it, but the quickest and simplest is to host 
+                                it on <Hyperlink RequestNavigate="Hyperlink_RequestNavigate" 
+                                                 NavigateUri="http://neocities.org">http://neocities.org</Hyperlink>. 
+                                The whole process shouldn't take more than a couple of minutes:<LineBreak/><LineBreak/>
+                                <Bold>1.</Bold> Goto 
+                                <Hyperlink RequestNavigate="Hyperlink_RequestNavigate" 
+                                           NavigateUri="http://neocities.org">http://neocities.org</Hyperlink> and sign up. 
+                                It should create a new website for you with a name you specify.<LineBreak/>
+                                <Bold>2.</Bold> Enter your neocities credentials below<LineBreak/>
+                                <Bold>3.</Bold> Load into a campaign save (it doesn't matter which one)<LineBreak/>
+                                <Bold>4.</Bold> Click the Generate Documentation Button<LineBreak/>
+                                <Bold>5.</Bold> Click the Upload Documentation Button<LineBreak/><LineBreak/>
+                                <Bold>6.</Bold> Reload your save (the process messes up the game state, so you need to reload your save)<LineBreak/><LineBreak/>
+                                Once the files have finished uploading your documentation website should be available. <LineBreak/>
+                                The link is at the top of dashboard page: 
+                                <Hyperlink RequestNavigate="Hyperlink_RequestNavigate" 
+                                           NavigateUri="http://neocities.org/dashboard">https://neocities.org/dashboard
+                                </Hyperlink>.<LineBreak/>
+                                When you change your settings, and want to update the documentation, repeat steps 3 to 5.
+                                <LineBreak/><LineBreak/>
+                                If you have any problems with this process please request help in the discord.
+                            </TextBlock>
+                            <Separator Height="20"/>
+                            <TextBlock DockPanel.Dock="Left" FontSize="16">Title</TextBlock>
+                            <TextBox Margin="15 5" Text="{Binding ConfigurationRoot.DocsTitle}"/>
+                            <TextBlock DockPanel.Dock="Left" FontSize="16">Introduction</TextBlock>
+                            <TextBox VerticalScrollBarVisibility="Visible" Margin="15 5" MinHeight="60" MaxHeight="120" Text="{Binding ConfigurationRoot.DocsIntroduction}" TextWrapping="Wrap" AcceptsReturn="True"/>
+                            <WrapPanel Margin="15 5" Orientation="Horizontal">
+                                <Button Name="GenerateDocumentationButton" Margin="0 0 15 0" HorizontalAlignment="Left" 
+                                        Click="GenerateDocumentationButton_OnClick">Generate Documentation</Button>
+                                <Button Margin="0 0 15 0" HorizontalAlignment="Left" 
+                                        Click="OpenGeneratedDocumentationButton_OnClick">Open Documentation</Button>
+                                <Button Margin="0 0 15 0" HorizontalAlignment="Left" 
+                                        Click="OpenGeneratedDocumentationFolderButton_OnClick">Open Documentation Folder</Button>
+                            </WrapPanel>
+                            <TextBlock Margin="15 5" Name="GenerateDocumentationResult"/>
+                            <Separator Height="20"/>
+                            <TextBlock>
+                                <Run>Enter your Neocities.org username and password below (they will be stored securely):</Run>
+                            </TextBlock>
+                            <StackPanel Margin="0 10" Orientation="Horizontal">
+                                <TextBlock Margin="15 0 10 0">Username</TextBlock><TextBox Name="NeocitiesUsername" VerticalAlignment="Center" MinWidth="150"/>
+                                <TextBlock Margin="15 0 10 0">Password</TextBlock><PasswordBox Name="NeocitiesPassword" VerticalAlignment="Center" MinWidth="150"/>
+                            </StackPanel>
+                            <TextBlock>
+                                Now you can click this button to upload the current contents of your documentation folder directly to your site,
+                                replacing whatever is currently there:
+                            </TextBlock>
+                            <Button Name="UploadDocumentationButton" Margin="15 10" HorizontalAlignment="Left"
+                                    Click="UploadDocumentation_OnClick">Upload Documentation</Button>
+                            <TextBlock Margin="15 5" Name="UploadStatus"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Margin="10 2">Authorize</TextBlock>
+                </TabItem.Header>
+                <ScrollViewer>
+                    <StackPanel>
+                        <TextBlock TextWrapping="Wrap">
+                            When you click the button your web browser will open on a Twitch page that will request 
+                            authorization for this mod. When you grant it, the page will automatically pass the 
+                            authorization to the mod, at which point you can close it and return here.
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Authorize" Margin="15" HorizontalAlignment="Left" Click="GenerateToken_OnClick"/>
+                            <StackPanel Name="GenerateTokenCancel" Orientation="Horizontal" Visibility="Collapsed">
+                                <Button Click="CancelAuth_OnClick">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock>Cancel</TextBlock>
+                                        <fa:ImageAwesome Icon="Spinner" Spin="True" Height="20" Width="20" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock FontSize="15" VerticalAlignment="Center" FontStyle="Italic" Foreground="Indigo">
+                                    Switch to your web browser now to grant authorization!
+                                </TextBlock>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" MouseUp="TestTokenButton_OnClick">
+                                <fa:ImageAwesome Name="AuthTokenTesting" Icon="Spinner" Spin="True" 
+                                                 Height="20" Width="20" Visibility="Collapsed" HorizontalAlignment="Right"/>
+                                <StackPanel Orientation="Horizontal" Name="AuthTokenTestSuccess" Visibility="Collapsed" >
+                                    <fa:ImageAwesome Icon="Check" Height="20" Width="20" Foreground="LimeGreen"/>
+                                    <TextBlock Margin="0" VerticalAlignment="Center" Foreground="LimeGreen" FontWeight="Bold">Authorized!</TextBlock>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Name="AuthTokenTestFailure" Visibility="Collapsed">
+                                    <fa:ImageAwesome Icon="Ban" Height="20" Width="20" Foreground="OrangeRed"/>
+                                    <TextBlock Margin="0" VerticalAlignment="Center" Foreground="OrangeRed" 
+                                               FontWeight="Bold">Not Authorized</TextBlock>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                        <Expander Header="Show Token (this should be kept secret!)">
+                            <TextBox Name="AuthTokenTextBox" IsReadOnly="True"/>    
+                        </Expander>
+                        <Separator Height="20"/>
+                        <TextBlock TextWrapping="Wrap">
+                            By default the bot will use your main account. This means it will be your name that appears 
+                            when the bot says things. If you want to use a different account for the bot then first 
+                            create a new twitch account with the bot name you want, sign into it on Twitch, then click 
+                            Authorize Bot Separately
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Authorize Bot Separately" Margin="15" 
+                                    HorizontalAlignment="Left" Click="GenerateBotToken_OnClick"/>
+                            <StackPanel Orientation="Horizontal" Visibility="Collapsed" Name="GenerateBotTokenCancel">
+                                <Button Click="CancelAuth_OnClick" >
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock>Cancel</TextBlock>
+                                        <fa:ImageAwesome Icon="Spinner" Spin="True" Height="20" Width="20" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock FontSize="15" VerticalAlignment="Center" 
+                                           FontStyle="Italic" Foreground="Indigo">
+                                    Switch to your web browser now to grant authorization!
+                                </TextBlock>
+                            </StackPanel>
+                            <Button Name="UseMainAccountForBotButton" Margin="15" Content="Use Main Account for Bot"  HorizontalAlignment="Left" Click="UseMainAccountForBot_OnClick"/>
+                        </StackPanel>
+                        <Expander Header="Show Bot Token (this should be kept secret!)">
+                            <TextBox Name="BotAccessTokenTextBox" IsReadOnly="True"/>    
+                        </Expander>
+                        <Separator Height="20"/>
+                        <TextBlock TextWrapping="Wrap">
+                            If you want to revoke access for any reason (for instance you think one of your tokens was 
+                            compromised), go to 
+                            <Hyperlink RequestNavigate="Hyperlink_RequestNavigate" 
+                                       NavigateUri="https://www.twitch.tv/settings/connections">
+                                https://www.twitch.tv/settings/connections
+                            </Hyperlink>, and disconnect the BannerlordIntegrationMod.
+                        </TextBlock>
+                        <Separator Height="20"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="20">Miscellaneous Settings</TextBlock>
+                        <CheckBox Margin="8 2" IsChecked="{Binding ConfigurationRoot.AffiliateSpoofing}"
+                                  VerticalContentAlignment="Center">
+                            <TextBlock TextWrapping="Wrap">
+                                Affiliate Spoofing (this is for debugging and testing purposes, it will stop normal 
+                                channel point rewards from working!)
+                            </TextBlock>
+                        </CheckBox>
+                        <CheckBox Margin="8 2" 
+                                  IsChecked="{Binding ConfigurationRoot.DisableAutomaticFulfillment}" 
+                                  VerticalContentAlignment="Center">
+                            <TextBlock TextWrapping="Wrap">Disable automatic Channel Point Rewards completion 
+                                (redemptions will remain in the queue to be refunded or completed at the streamers 
+                                discretion)</TextBlock>
+                        </CheckBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Margin="10 2">Log</TextBlock>
+                </TabItem.Header>
+                <ListBox ItemsSource="{Binding LogEntries}" 
+                         utils:ListBoxExtenders.AutoScrollToEnd="True"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         Background="LightGray"
+                         >
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Level}" 
+                                           Foreground="{Binding LevelColor}" 
+                                           TextAlignment="Right"
+                                           FontWeight="DemiBold"
+                                           Padding="4 0"
+                                           FontFamily="Consolas"
+                                           HorizontalAlignment="Stretch"
+                                           Background="Gray"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Message, Mode=OneWay}"
+                                           Padding="4 0"
+                                           FontFamily="Consolas"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>
