@@ -168,8 +168,15 @@ namespace BLTAdoptAHero
                         // Stop adopted hero from dying if death is disabled or death chance roll fails
                         if (affectedAgent.IsAdopted())
                         {
+                            // The age test used to read "MinimumAge <= hero.Age", which forced an
+                            // ADULT hero unconscious - i.e. it made heroes older than MinimumAge
+                            // immortal and only let young ones die, the exact opposite of what
+                            // MinimumAge means. With the default MinimumAge of 30 that made
+                            // practically every adopted hero unkillable in battle. The Harmony
+                            // guard (BLTNoDeathAllowed) already had the correct test, so the two
+                            // contradicted each other. Correct sense: too young -> survives.
                             if (!BLTAdoptAHeroModule.CommonConfig.AllowDeath
-                                || StaticRandom.Next() > BLTAdoptAHeroModule.CommonConfig.DeathChance || BLTAdoptAHeroModule.CommonConfig.MinimumAge <= affectedAgent.GetHero().Age)
+                                || StaticRandom.Next() > BLTAdoptAHeroModule.CommonConfig.DeathChance || affectedAgent.GetHero().Age < BLTAdoptAHeroModule.CommonConfig.MinimumAge)
                             {
                                 agentState = affectedAgent.State = AgentState.Unconscious;
                             }
