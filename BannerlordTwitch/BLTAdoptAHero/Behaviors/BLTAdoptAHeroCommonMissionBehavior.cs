@@ -5,6 +5,7 @@ using BannerlordTwitch.Helpers;
 using BannerlordTwitch.Localization;
 using BannerlordTwitch.Util;
 using BLTAdoptAHero.UI;
+using BLTAdoptAHero.Behaviors;
 using HarmonyLib;
 using JetBrains.Annotations;
 using TaleWorlds.CampaignSystem;
@@ -237,6 +238,14 @@ namespace BLTAdoptAHero
                     }
 
                     GetHeroMissionState(affectedHero).LastAgentState = agentState;
+
+                    // A nameless soldier that lands the killing blow can rise as a lord and become
+                    // this hero's nemesis. Only fires when the killer has no Hero of its own, so
+                    // ordinary lord-vs-hero kills are untouched.
+                    if (agentState == AgentState.Killed || agentState == AgentState.Unconscious)
+                    {
+                        BLTTroopAscension.OnAdoptedHeroKilled(affectedHero, affectorAgent);
+                    }
                 }
 
                 var affectorHero = affectorAgent.GetAdoptedHero();
@@ -457,6 +466,13 @@ namespace BLTAdoptAHero
 
         public void ApplyKillEffects(Hero hero, Agent killer, Agent killed, AgentState state, int goldPerKill, int healPerKill, int xpPerKill, float subBoost, float? relativeLevelScaling, float? levelScalingCap, float MinimumGoldPerKill)
         {
+            // Nemesis tracking: an adopted hero killing an enemy lord settles (or starts paying down) a rivalry.
+            var killedHero = (killed?.Character as CharacterObject)?.HeroObject;
+            if (killedHero != null)
+            {
+                BLTNemesisBehavior.Current?.RecordVictory(hero, killedHero);
+            }
+
             goldPerKill = (int)(goldPerKill * subBoost);
             healPerKill = (int)(healPerKill * subBoost);
             xpPerKill = (int)(xpPerKill * subBoost);

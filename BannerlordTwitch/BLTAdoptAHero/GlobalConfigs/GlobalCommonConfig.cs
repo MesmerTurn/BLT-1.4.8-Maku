@@ -36,9 +36,257 @@ namespace BLTAdoptAHero
      CategoryOrder("Kill Streak Rewards", 10),
      CategoryOrder("Achievements", 11),
      CategoryOrder("Shouts", 12),
+     CategoryOrder("Boss", 14),
+     CategoryOrder("Troop Ascension", 13),
      LocDisplayName("{=vDjnDtoL}Common Config")]
     internal class GlobalCommonConfig : IUpdateFromDefault, IDocumentable, INotifyPropertyChanged
     {
+        #region Boss
+        [LocDisplayName("{=}Enabled"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Whether random bosses can appear in battles at all"),
+         PropertyOrder(1), UsedImplicitly]
+        public bool BossEnabled { get; set; } = true;
+
+        [LocDisplayName("{=}Drop Chance Epic"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Chance that killing an Epic boss awards one of its own items to the killer, named after the boss and carrying a strong modifier."),
+         PropertyOrder(40), Range(0f, 100f), UsedImplicitly]
+        public float BossDropChanceEpic { get; set; } = 25f;
+
+        [LocDisplayName("{=}Drop Chance Legendary"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}As above, for Legendary bosses. Common bosses never drop anything - the drop is meant to be a trophy."),
+         PropertyOrder(41), Range(0f, 100f), UsedImplicitly]
+        public float BossDropChanceLegendary { get; set; } = 100f;
+
+        [LocDisplayName("{=}Drop Power Epic"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Strength of the modifier on an Epic boss drop. These are absolute bonuses, not percentages: weapon damage and speed, or armour points."),
+         PropertyOrder(42), Range(0, 200), UsedImplicitly]
+        public int BossDropPowerEpic { get; set; } = 20;
+
+        [LocDisplayName("{=}Drop Power Legendary"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Strength of the modifier on a Legendary boss drop."),
+         PropertyOrder(43), Range(0, 200), UsedImplicitly]
+        public int BossDropPowerLegendary { get; set; } = 40;
+
+        [LocDisplayName("{=}Can Spawn On Ally Side"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}If checked, the boss has a chance to spawn on the player's own side instead of the enemy's (50/50 each time it spawns). If unchecked, bosses always spawn on the enemy side."),
+         PropertyOrder(2), UsedImplicitly]
+        public bool BossCanSpawnOnAllySide { get; set; } = false;
+
+        [LocDisplayName("{=}Max Bosses Per Battle"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Hard cap on how many bosses can be spawned in a single battle. The spawn roll (Common/Epic/Legendary chances) runs independently once per potential side (Enemy, and Ally if enabled above), so up to 2 can appear from a single battle's rolls by default - raise this if you want more chances stacked in."),
+         PropertyOrder(4), Range(1, 6), UsedImplicitly]
+        public int BossMaxPerBattle { get; set; } = 2;
+
+        // These are independent percentages, not relative weights - checked rarest-first
+        // (Legendary, then Epic, then Common) so only one can trigger per roll. Whatever's left
+        // over (100 - Legendary - Epic - Common) is the chance of no boss at all that roll.
+        // Defaults (5/20/50) leave a 25% chance of nothing spawning. Field battles and sieges
+        // have separate sliders since a streamer may want bosses far more (or less) likely in one
+        // than the other.
+        [LocDisplayName("{=}Field Battle: Common Chance Percent"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Chance (0-100) of a Common boss in a field battle, on a roll that already failed the Epic and Legendary checks"),
+         PropertyOrder(5), Range(0f, 100f), Editor(typeof(SliderFloatEditor), typeof(SliderFloatEditor)),
+         UsedImplicitly]
+        public float BossCommonWeightFieldBattle { get; set; } = 50f;
+
+        [LocDisplayName("{=}Field Battle: Epic Chance Percent"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Chance (0-100) of an Epic boss in a field battle, on a roll that already failed the Legendary check"),
+         PropertyOrder(6), Range(0f, 100f), Editor(typeof(SliderFloatEditor), typeof(SliderFloatEditor)),
+         UsedImplicitly]
+        public float BossEpicWeightFieldBattle { get; set; } = 20f;
+
+        [LocDisplayName("{=}Field Battle: Legendary Chance Percent"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Chance (0-100) of a Legendary boss in a field battle - checked first, before Epic and Common"),
+         PropertyOrder(7), Range(0f, 100f), Editor(typeof(SliderFloatEditor), typeof(SliderFloatEditor)),
+         UsedImplicitly]
+        public float BossLegendaryWeightFieldBattle { get; set; } = 5f;
+
+        [LocDisplayName("{=}Siege: Common Chance Percent"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Chance (0-100) of a Common boss in a siege, on a roll that already failed the Epic and Legendary checks"),
+         PropertyOrder(8), Range(0f, 100f), Editor(typeof(SliderFloatEditor), typeof(SliderFloatEditor)),
+         UsedImplicitly]
+        public float BossCommonWeightSiege { get; set; } = 50f;
+
+        [LocDisplayName("{=}Siege: Epic Chance Percent"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Chance (0-100) of an Epic boss in a siege, on a roll that already failed the Legendary check"),
+         PropertyOrder(9), Range(0f, 100f), Editor(typeof(SliderFloatEditor), typeof(SliderFloatEditor)),
+         UsedImplicitly]
+        public float BossEpicWeightSiege { get; set; } = 20f;
+
+        [LocDisplayName("{=}Siege: Legendary Chance Percent"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Chance (0-100) of a Legendary boss in a siege - checked first, before Epic and Common"),
+         PropertyOrder(10), Range(0f, 100f), Editor(typeof(SliderFloatEditor), typeof(SliderFloatEditor)),
+         UsedImplicitly]
+        public float BossLegendaryWeightSiege { get; set; } = 5f;
+
+        // A boss has no real battle/kill history, so the normal per-power Requirements (kills,
+        // battles played, etc) can never be met - without this, a freshly spawned boss would have
+        // its class assigned but stand there with every active/passive power locked. Instead of
+        // evaluating Requirements at all for a boss, force-unlock the first N powers (in the
+        // class's configured order) from its ActivePowerGroup/PassivePowerGroup - these numbers
+        // are "how many powers deep" rather than a literal tier number, since powers in this fork
+        // don't carry an explicit tier field of their own.
+        [LocDisplayName("{=}Common Power Count"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}How many of the class's powers (in configured order) a Common boss has force-unlocked, ignoring their normal Requirements"),
+         PropertyOrder(11), Range(0, 8), UsedImplicitly]
+        public int BossCommonPowerCount { get; set; } = 1;
+
+        [LocDisplayName("{=}Epic Power Count"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}How many of the class's powers an Epic boss has force-unlocked"),
+         PropertyOrder(12), Range(0, 8), UsedImplicitly]
+        public int BossEpicPowerCount { get; set; } = 2;
+
+        [LocDisplayName("{=}Legendary Power Count"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}How many of the class's powers a Legendary boss has force-unlocked"),
+         PropertyOrder(13), Range(0, 8), UsedImplicitly]
+        public int BossLegendaryPowerCount { get; set; } = 3;
+
+        [LocDisplayName("{=}Common HP Multiplier"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}HP multiplier applied to a Common boss, on top of its base troop HP"),
+         PropertyOrder(14), UsedImplicitly]
+        public float BossCommonHpMultiplier { get; set; } = 8f;
+
+        [LocDisplayName("{=}Epic HP Multiplier"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}HP multiplier applied to an Epic boss"),
+         PropertyOrder(15), UsedImplicitly]
+        public float BossEpicHpMultiplier { get; set; } = 15f;
+
+        [LocDisplayName("{=}Legendary HP Multiplier"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}HP multiplier applied to a Legendary boss"),
+         PropertyOrder(16), UsedImplicitly]
+        public float BossLegendaryHpMultiplier { get; set; } = 25f;
+
+        [LocDisplayName("{=}Common Armor Multiplier"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Armor multiplier applied to a Common boss"),
+         PropertyOrder(17), UsedImplicitly]
+        public float BossCommonArmorMultiplier { get; set; } = 1.5f;
+
+        [LocDisplayName("{=}Epic Armor Multiplier"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Armor multiplier applied to an Epic boss"),
+         PropertyOrder(18), UsedImplicitly]
+        public float BossEpicArmorMultiplier { get; set; } = 2f;
+
+        [LocDisplayName("{=}Legendary Armor Multiplier"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Armor multiplier applied to a Legendary boss"),
+         PropertyOrder(19), UsedImplicitly]
+        public float BossLegendaryArmorMultiplier { get; set; } = 3f;
+
+        [LocDisplayName("{=}Scale Common"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Visual size multiplier for a Common boss"),
+         PropertyOrder(20), UsedImplicitly]
+        public float BossCommonScale { get; set; } = 1.15f;
+
+        [LocDisplayName("{=}Scale Epic"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Visual size multiplier for an Epic boss"),
+         PropertyOrder(21), UsedImplicitly]
+        public float BossEpicScale { get; set; } = 1.5f;
+
+        [LocDisplayName("{=}Scale Legendary"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Visual size multiplier for a Legendary boss"),
+         PropertyOrder(22), UsedImplicitly]
+        public float BossLegendaryScale { get; set; } = 1.7f;
+
+        [LocDisplayName("{=}Gold Reward"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Base gold reward for the BLT hero who lands the killing blow on a Common boss - Epic/Legendary scale this up automatically"),
+         PropertyOrder(23), UsedImplicitly]
+        public int BossGoldReward { get; set; } = 20000;
+
+        [LocDisplayName("{=}XP Reward"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Base XP reward for the BLT hero who lands the killing blow on a Common boss - Epic/Legendary scale this up automatically"),
+         PropertyOrder(24), UsedImplicitly]
+        public int BossXPReward { get; set; } = 20000;
+
+        [LocDisplayName("{=}Common Bar Color"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}HP bar color for a Common boss, hex ARGB (e.g. #C0C0C0F0)"),
+         PropertyOrder(25), UsedImplicitly]
+        public string BossCommonBarColor { get; set; } = "#C0C0C0F0"; // silver/grey
+
+        [LocDisplayName("{=}Epic Bar Color"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}HP bar color for an Epic boss, hex ARGB"),
+         PropertyOrder(26), UsedImplicitly]
+        public string BossEpicBarColor { get; set; } = "#A335EEF0"; // purple
+
+        [LocDisplayName("{=}Legendary Bar Color"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}HP bar color for a Legendary boss, hex ARGB"),
+         PropertyOrder(27), UsedImplicitly]
+        public string BossLegendaryBarColor { get; set; } = "#FF8000F0"; // orange/gold
+
+        [LocDisplayName("{=}HP Regenerates"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Whether the boss slowly heals over time like a normal troop. Off by default - a boss is meant to be worn down permanently, not outlasted."),
+         PropertyOrder(28), UsedImplicitly]
+        public bool BossHpRegenerates { get; set; } = false;
+
+        [LocDisplayName("{=}Bar Width"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Width in pixels of the boss name and HP bar drawn over the boss. Lower it if the label gets in the way when aiming at range."),
+         PropertyOrder(29), Range(50, 250), UsedImplicitly]
+        public int BossBarWidth { get; set; } = 100;
+
+        [LocDisplayName("{=}Allow Mounted Bosses"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Whether a boss may use one of your mounted classes. Off by default: a mounted boss makes no sense in a siege, and does not fit factions that do not fight on horseback."),
+         PropertyOrder(30), UsedImplicitly]
+        public bool BossAllowMounted { get; set; } = false;
+
+        #endregion
+
+        #region Troop Ascension
+        [LocDisplayName("{=TrAscEn}Enabled"),
+         LocCategory("Troop Ascension", "{=TrAscCat}Troop Ascension"),
+         LocDescription("{=TrAscEnDesc}When a nameless soldier kills an adopted hero, give them a chance to rise as a lord of their own clan, outside any kingdom, and become that hero's nemesis."),
+         PropertyOrder(1), UsedImplicitly]
+        public bool TroopAscensionEnabled { get; set; } = false;
+
+        [LocDisplayName("{=TrAscCh}Chance Percent"),
+         LocCategory("Troop Ascension", "{=TrAscCat}Troop Ascension"),
+         LocDescription("{=TrAscChDesc}Chance that a nameless soldier who kills an adopted hero is promoted to a lord. Keep it low - every promotion creates a permanent clan in the campaign."),
+         PropertyOrder(2), Range(0f, 100f), UsedImplicitly]
+        public float TroopAscensionChancePercent { get; set; } = 5f;
+
+        [LocDisplayName("{=TrAscRen}Starting Renown"),
+         LocCategory("Troop Ascension", "{=TrAscCat}Troop Ascension"),
+         LocDescription("{=TrAscRenDesc}Renown the new clan starts with."),
+         PropertyOrder(3), Range(0, 10000), UsedImplicitly]
+        public int TroopAscensionRenown { get; set; } = 150;
+
+        [LocDisplayName("{=TrAscGold}Starting Gold"),
+         LocCategory("Troop Ascension", "{=TrAscCat}Troop Ascension"),
+         LocDescription("{=TrAscGoldDesc}Gold the new lord starts with, so they can actually raise a party."),
+         PropertyOrder(4), Range(0, 1000000), UsedImplicitly]
+        public int TroopAscensionStartingGold { get; set; } = 10000;
+        #endregion
+
         #region Static
         private const string ID = "Adopt A Hero - General Config";
 

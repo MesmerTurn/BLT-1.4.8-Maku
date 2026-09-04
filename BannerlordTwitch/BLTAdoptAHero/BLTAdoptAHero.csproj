@@ -401,6 +401,14 @@
     <Compile Include="Behaviors\HarmonyPatches.cs" />
     <Compile Include="Behaviors\KingdomTaxBehavior.cs" />
     <Compile Include="Behaviors\PartyOrderBehavior.cs" />
+    <Compile Include="Actions\Bounty.cs" />
+    <Compile Include="Actions\Nemesis.cs" />
+    <Compile Include="Actions\PromoteRetinue.cs" />
+    <Compile Include="Actions\Util\BossNamePool.cs" />
+    <Compile Include="Behaviors\BLTBossMissionBehavior.cs" />
+    <Compile Include="Behaviors\BLTBountyBehavior.cs" />
+    <Compile Include="Behaviors\BLTNemesisBehavior.cs" />
+    <Compile Include="Behaviors\BLTTroopAscensionBehavior.cs" />
     <Compile Include="Behaviors\PowerHandler.cs" />
     <Compile Include="Behaviors\ReinforcementBehavior.cs" />
     <Compile Include="Behaviors\TrainingBehavior.cs" />
