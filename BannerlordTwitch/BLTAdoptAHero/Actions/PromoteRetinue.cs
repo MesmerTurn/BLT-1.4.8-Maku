@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using BannerlordTwitch;
 using BannerlordTwitch.Localization;
@@ -52,12 +53,24 @@ namespace BLTAdoptAHero
              PropertyOrder(4), UsedImplicitly]
             public int LordRenown { get; set; } = 150;
 
+            [LocDisplayName("{=promote017}Max Companions"),
+             LocDescription("{=promote018}How many companions one viewer may ever promote out of their retinue. Counted for the lifetime of the hero, so it does not refill when a promoted companion dies or leaves. Set to 0 for no limit."),
+             PropertyOrder(5), Range(0, 100), UsedImplicitly]
+            public int MaxCompanions { get; set; } = 5;
+
+            [LocDisplayName("{=promote019}Max Lords"),
+             LocDescription("{=promote020}How many lords one viewer may ever promote. Each one creates a permanent clan in the campaign, so this is deliberately lower than the companion limit. Counted for the lifetime of the hero. Set to 0 for no limit."),
+             PropertyOrder(6), Range(0, 100), UsedImplicitly]
+            public int MaxLords { get; set; } = 3;
+
             public void GenerateDocumentation(IDocumentationGenerator generator)
             {
                 generator.PropertyValuePair("Companion Cost", CompanionCost.ToString());
                 generator.PropertyValuePair("Lord Cost", LordCost.ToString());
                 generator.PropertyValuePair("Allow Lord Promotion", AllowLordPromotion.ToString());
                 generator.PropertyValuePair("Lord Starting Renown", LordRenown.ToString());
+                generator.PropertyValuePair("Max Companions", MaxCompanions == 0 ? "unlimited" : MaxCompanions.ToString());
+                generator.PropertyValuePair("Max Lords", MaxLords == 0 ? "unlimited" : MaxLords.ToString());
             }
         }
 
@@ -96,6 +109,22 @@ namespace BLTAdoptAHero
             if (asLord && !settings.AllowLordPromotion)
             {
                 onFailure("{=promote013}Lord promotion is disabled".Translate());
+                return;
+            }
+
+            // Lifetime cap, checked before anything is spent. Deliberately not "how many are
+            // alive right now": counting live characters would quietly hand the viewer a new slot
+            // every time one of their lords was killed or captured, which is the opposite of a cap.
+            int used = asLord
+                ? BLTAdoptAHeroCampaignBehavior.Current.GetPromotedLordCount(adoptedHero)
+                : BLTAdoptAHeroCampaignBehavior.Current.GetPromotedCompanionCount(adoptedHero);
+            int allowed = asLord ? settings.MaxLords : settings.MaxCompanions;
+
+            if (allowed > 0 && used >= allowed)
+            {
+                onFailure(asLord
+                    ? "{=promote021}You have already promoted {USED} of {MAX} lords".Translate(("USED", used), ("MAX", allowed))
+                    : "{=promote022}You have already promoted {USED} of {MAX} companions".Translate(("USED", used), ("MAX", allowed)));
                 return;
             }
 
@@ -152,8 +181,10 @@ namespace BLTAdoptAHero
                     }
                 }
 
-                // Only charge, and only consume the retinue slot, once the promotion succeeded.
+                // Only charge, consume the retinue slot, and count it against the cap once the
+                // promotion actually succeeded - a failed attempt should not burn a slot.
                 BLTAdoptAHeroCampaignBehavior.Current.ChangeHeroGold(adoptedHero, -cost, true);
+                BLTAdoptAHeroCampaignBehavior.Current.RecordPromotion(adoptedHero, asLord);
                 // Take it out of whichever list it came from, so the slot is spent once and the
                 // troop is not duplicated between the two rosters.
                 if (fromElite)

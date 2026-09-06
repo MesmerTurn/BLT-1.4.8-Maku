@@ -61,6 +61,14 @@ namespace BLTAdoptAHero
             public bool IsCreatedHero { get; set; } = false;
             public string LegacyName { get; set; } = null;
 
+            // How many characters this viewer has had promoted out of their retinue, counted for
+            // the lifetime of the hero. Kept as a running total rather than counted from the
+            // campaign, because a promoted companion or lord can later die, be captured or leave -
+            // and a limit that refills itself when your lords get killed is not a limit.
+            // Defaults to 0, so saves made before this existed simply start from zero.
+            public int PromotedCompanions { get; set; }
+            public int PromotedLords { get; set; }
+
             //public bool MesssageFlag { get; set; } = false;
             //public string MessageContent { get; set; } = null;
 
@@ -1190,6 +1198,29 @@ namespace BLTAdoptAHero
         #region Retinue
         public IEnumerable<CharacterObject> GetRetinue(Hero hero)
             => GetHeroData(hero).Retinue.Select(r => r.TroopType);
+
+        /// <summary>
+        /// How many companions this hero has had promoted out of their retinue, for the lifetime
+        /// of the hero.
+        /// </summary>
+        public int GetPromotedCompanionCount(Hero hero) => GetHeroData(hero).PromotedCompanions;
+
+        /// <summary>
+        /// How many lords this hero has had promoted out of their retinue, for the lifetime of
+        /// the hero.
+        /// </summary>
+        public int GetPromotedLordCount(Hero hero) => GetHeroData(hero).PromotedLords;
+
+        /// <summary>
+        /// Records a completed promotion against the hero's lifetime total. Call this only after
+        /// the character has actually been created.
+        /// </summary>
+        public void RecordPromotion(Hero hero, bool asLord)
+        {
+            var data = GetHeroData(hero);
+            if (asLord) data.PromotedLords++;
+            else data.PromotedCompanions++;
+        }
 
         /// <summary>
         /// Removes a single troop of this type from the hero's retinue. Used when a retinue member
