@@ -285,6 +285,18 @@ namespace BLTAdoptAHero
          LocDescription("{=TrAscGoldDesc}Gold the new lord starts with, so they can actually raise a party."),
          PropertyOrder(4), Range(0, 1000000), UsedImplicitly]
         public int TroopAscensionStartingGold { get; set; } = 10000;
+
+        [LocDisplayName("{=TrAscMax}Max Lords Per Campaign"),
+         LocCategory("Troop Ascension", "{=TrAscCat}Troop Ascension"),
+         LocDescription("{=TrAscMaxDesc}Hard limit on how many lords troop ascension may ever create in this campaign. Counted for the lifetime of the save, not by how many are currently alive - each promotion leaves a permanent clan behind whether its founder survives or not. Set to 0 for no limit."),
+         PropertyOrder(5), Range(0, 100), UsedImplicitly]
+        public int TroopAscensionMaxLords { get; set; } = 5;
+
+        [LocDisplayName("{=TrAscCool}Minimum Days Between"),
+         LocCategory("Troop Ascension", "{=TrAscCat}Troop Ascension"),
+         LocDescription("{=TrAscCoolDesc}Days that must pass between one promotion and the next. Stops a single bad battle turning into a run of new clans when several heroes die at once. Set to 0 to allow them back to back."),
+         PropertyOrder(6), Range(0, 365), UsedImplicitly]
+        public int TroopAscensionCooldownDays { get; set; } = 7;
         #endregion
 
         #region Static

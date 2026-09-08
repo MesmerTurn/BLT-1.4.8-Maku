@@ -112,7 +112,23 @@ namespace BLTAdoptAHero
             }
         }
 
-        private Dictionary<Hero, HeroData> heroData = new();       
+        private Dictionary<Hero, HeroData> heroData = new();
+
+        // How many lords troop ascension has created in this campaign, ever. Kept here rather than
+        // in the ascension class itself because that is static and has no save of its own, and a
+        // cap that resets when a lord dies is not a cap - each promotion leaves a permanent clan
+        // behind whether or not its founder survives.
+        private int ascendedLordCount;
+
+        /// <summary>
+        /// Lifetime number of lords created by troop ascension in this campaign.
+        /// </summary>
+        public int GetAscendedLordCount() => ascendedLordCount;
+
+        /// <summary>
+        /// Records that troop ascension has created another lord. Call only after the clan exists.
+        /// </summary>
+        public void RecordAscendedLord() => ascendedLordCount++;       
         private Dictionary<Hero, HashSet<Guid>> heroAchievementPassivePowers = new();
         #endregion
 
@@ -338,6 +354,11 @@ namespace BLTAdoptAHero
             using var scopedJsonSync = new ScopedJsonSync(dataStore, nameof(BLTAdoptAHeroCampaignBehavior));
 
             scopedJsonSync.SyncDataAsJson("HeroData", ref heroData);
+
+            // Saves made before this existed simply load 0, which is the right starting point:
+            // there is no record of earlier promotions to count, and inventing one would be worse
+            // than starting the allowance fresh.
+            dataStore.SyncData("BLTAscendedLordCount", ref ascendedLordCount);
 
             if (dataStore.IsLoading)
             {

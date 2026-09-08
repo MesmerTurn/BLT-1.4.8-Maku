@@ -26,6 +26,11 @@ namespace BLTAdoptAHero
     /// </summary>
     public static class BLTTroopAscension
     {
+        // When the last promotion happened, for the cooldown. Deliberately not saved: after a
+        // reload the worst case is one promotion sooner than intended, which is a far smaller
+        // problem than adding another field to the save format for it.
+        private static CampaignTime? lastAscension;
+
         /// <summary>
         /// Called when an adopted hero is killed. Does nothing unless the killer was a nameless
         /// troop and the configured chance rolls through.
@@ -43,6 +48,30 @@ namespace BLTAdoptAHero
             // another adopted hero, and is handled by the ordinary nemesis path.
             if (killerCharacter.HeroObject != null) return;
             if (!killerAgent.IsHuman) return;
+
+            // Safety nets, requested by Maku after watching this fire more often than expected.
+            // Checked before the dice, so a blocked promotion does not quietly consume the roll.
+            var campaign = BLTAdoptAHeroCampaignBehavior.Current;
+
+            if (cfg.TroopAscensionMaxLords > 0
+                && campaign?.GetAscendedLordCount() >= cfg.TroopAscensionMaxLords)
+            {
+                Log.Trace($"[TroopAscension] Campaign limit of {cfg.TroopAscensionMaxLords} lords reached, skipping.");
+                return;
+            }
+
+            // A battle can kill several adopted heroes in seconds. Without a gap between
+            // promotions, one bad fight turns into a handful of permanent new clans at once.
+            if (cfg.TroopAscensionCooldownDays > 0 && lastAscension.HasValue)
+            {
+                float daysSince = lastAscension.Value.ElapsedDaysUntilNow;
+                if (daysSince < cfg.TroopAscensionCooldownDays)
+                {
+                    Log.Trace($"[TroopAscension] Only {daysSince:F1} days since the last promotion " +
+                              $"(needs {cfg.TroopAscensionCooldownDays}), skipping.");
+                    return;
+                }
+            }
 
             if (MBRandom.RandomFloat * 100f >= cfg.TroopAscensionChancePercent) return;
 
@@ -65,6 +94,11 @@ namespace BLTAdoptAHero
             // Register the rivalry the promotion came from: this lord exists because they killed
             // this hero, so the very first nemesis record should say so.
             BLTNemesisBehavior.Current?.RecordDefeat(victim, newLord);
+
+            // Counted only once the clan actually exists, so a failed promotion spends neither the
+            // campaign allowance nor the cooldown.
+            BLTAdoptAHeroCampaignBehavior.Current?.RecordAscendedLord();
+            lastAscension = CampaignTime.Now;
 
             Log.LogFeedEvent("{=}{TROOP} slew {VICTIM} and has risen as a lord of their own clan!"
                 .Translate(("TROOP", newLord.Name.ToString()), ("VICTIM", victim.Name.ToString())));
