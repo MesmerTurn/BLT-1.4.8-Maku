@@ -73,4 +73,62 @@ namespace BLTAdoptAHero.Behaviors
             return null;
         }
     }
+
+    /// <summary>
+    /// The same protection for the other half of the daily clan tick.
+    ///
+    /// Also reported by Maku: NullReferenceException in
+    /// DefaultPartySizeLimitModel.FindAppropriateInitialRosterForMobileParty, reached from
+    /// HeroSpawnCampaignBehavior.TrySpawnHeroesAndParties. The game spawns a party for any lord
+    /// that lacks one, and building that party needs the clan's culture, its party template and
+    /// the lord's home settlement. A clan short of any of those kills the tick for everyone.
+    ///
+    /// Guarded at the clan level rather than deeper down, so exactly one clan is skipped for one
+    /// day and the rest of the campaign ticks normally.
+    /// </summary>
+    [HarmonyPatch]
+    public static class HeroSpawnCrashGuard
+    {
+        private static IEnumerable<MethodBase> FindTargets() =>
+            new[] { "HeroSpawnCampaignBehavior" }
+                .Select(AccessTools.TypeByName)
+                .Where(t => t != null)
+                .Select(t => AccessTools.DeclaredMethod(t, "TrySpawnHeroesAndParties"))
+                .Where(m => m != null)
+                .Cast<MethodBase>();
+
+        static bool Prepare() => FindTargets().Any();
+
+        static IEnumerable<MethodBase> TargetMethods() => FindTargets();
+
+        private static readonly HashSet<string> Reported = new();
+
+        static Exception Finalizer(Exception __exception, Clan __0)
+        {
+            if (__exception == null) return null;
+
+            try
+            {
+                string id = __0?.StringId ?? "<null clan>";
+                if (Reported.Add(id))
+                {
+                    Log.Error(
+                        $"[SpawnGuard] Party spawning crashed on clan '{__0?.Name}' ({id}) and was skipped. " +
+                        $"culture={__0?.Culture?.StringId ?? "NULL"}, " +
+                        $"partyTemplate={__0?.Culture?.DefaultPartyTemplate?.StringId ?? "NULL"}, " +
+                        $"leader={__0?.Leader?.Name?.ToString() ?? "NULL"}, " +
+                        $"leaderHome={__0?.Leader?.HomeSettlement?.Name?.ToString() ?? "NULL"}, " +
+                        $"clanHome={__0?.HomeSettlement?.Name?.ToString() ?? "NULL"}, " +
+                        $"kingdom={__0?.Kingdom?.Name?.ToString() ?? "none"} " +
+                        $":: {__exception.GetType().Name}: {__exception.Message}");
+                }
+            }
+            catch
+            {
+                // Never let the reporting be what breaks the tick.
+            }
+
+            return null;
+        }
+    }
 }

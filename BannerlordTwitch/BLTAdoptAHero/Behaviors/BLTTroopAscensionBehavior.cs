@@ -96,6 +96,13 @@ namespace BLTAdoptAHero
             hero.Clan = clan;
             hero.SetNewOccupation(Occupation.Lord);
             clan.SetLeader(hero);
+
+            // Give the lord a home settlement of their own. The clan has one, but the hero is
+            // asked for theirs independently: the daily tick tries to spawn a party for any lord
+            // without one, and that path resolves a spawn position and starting roster through the
+            // hero. A lord with no home is how that ends up dereferencing nothing.
+            try { hero.UpdateHomeSettlement(); }
+            catch (Exception ex) { Log.Error($"[TroopAscension] Could not set home settlement: {ex.Message}"); }
             clan.IsNoble = true;
             CampaignEventDispatcher.Instance.OnClanCreated(clan, false);
 
