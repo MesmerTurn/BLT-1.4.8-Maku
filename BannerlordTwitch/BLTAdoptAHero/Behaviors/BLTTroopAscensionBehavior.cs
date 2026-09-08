@@ -80,7 +80,12 @@ namespace BLTAdoptAHero
             string clanName = "{=}Clan of {NAME}".Translate(("NAME", hero.Name.ToString()));
             var clan = Clan.CreateClan(clanName);
             clan.ChangeClanName(new TextObject(clanName), new TextObject(clanName));
-            clan.Culture = hero.Culture ?? hero.CharacterObject?.Culture;
+            // Never leave a clan without a culture: vanilla's daily clan tick reads it, and a null
+            // there crashes the campaign rather than just this clan.
+            clan.Culture = hero.Culture
+                           ?? hero.CharacterObject?.Culture
+                           ?? Clan.PlayerClan?.Culture
+                           ?? Settlement.All.FirstOrDefault(s => s.Culture != null)?.Culture;
             clan.Banner = Banner.CreateRandomBanner();
             clan.Kingdom = null;
             clan.AddRenown(renown, false);

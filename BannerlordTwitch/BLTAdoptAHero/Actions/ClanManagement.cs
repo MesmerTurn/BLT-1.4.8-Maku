@@ -501,7 +501,13 @@ namespace BLTAdoptAHero.Actions
             }
             var newClan = Clan.CreateClan(fullClanName);
             newClan.ChangeClanName(new TextObject(fullClanName), new TextObject(fullClanName));
-            newClan.Culture = adoptedHero.Culture;
+            // Never leave a clan without a culture. Vanilla walks every clan on the daily tick -
+            // War Sails' naval navigation check among others - and a null culture there takes the
+            // whole campaign down rather than just misbehaving for this one clan.
+            newClan.Culture = adoptedHero.Culture
+                              ?? adoptedHero.CharacterObject?.Culture
+                              ?? Clan.PlayerClan?.Culture
+                              ?? Settlement.All.FirstOrDefault(s => s.Culture != null)?.Culture;
             newClan.Banner = Banner.CreateRandomBanner();
             //newClan.Initialize(new TextObject(fullClanName), new TextObject(fullClanName), clanCulture, clanBanner);
             newClan.Kingdom = null;
