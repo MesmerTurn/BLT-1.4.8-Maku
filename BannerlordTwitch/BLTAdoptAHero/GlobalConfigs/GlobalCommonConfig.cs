@@ -241,6 +241,12 @@ namespace BLTAdoptAHero
          PropertyOrder(27), UsedImplicitly]
         public string BossLegendaryBarColor { get; set; } = "#FF8000F0"; // orange/gold
 
+        [LocDisplayName("{=}Never Flees"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Keep the boss fighting no matter how badly its side is losing. Without this a boss inherits the morale of the army around it and can break and run, which ends the fight it was supposed to be the centrepiece of."),
+         PropertyOrder(32), UsedImplicitly]
+        public bool BossNeverFlees { get; set; } = true;
+
         [LocDisplayName("{=}HP Regenerates"),
          LocCategory("Boss", "{=}Boss"),
          LocDescription("{=}Whether the boss slowly heals over time like a normal troop. Off by default - a boss is meant to be worn down permanently, not outlasted."),

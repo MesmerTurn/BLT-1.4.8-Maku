@@ -640,6 +640,16 @@ namespace BLTAdoptAHero
                             state.Agent.Health = state.Agent.HealthLimit;
                     }
 
+                    // Bosses do not run. Morale is what makes an agent break and flee, and a boss
+                    // spawned into a losing side inherits its army's panic - so a fight that was
+                    // meant to be the centrepiece ends with the boss sprinting off the map.
+                    // Re-asserted every tick rather than set once at spawn, because morale is
+                    // driven down continuously by casualties around it.
+                    if (cfg?.BossNeverFlees == true)
+                    {
+                        state.Agent.SetMorale(100f);
+                    }
+
                     // Keep the class's active powers permanently up - they're duration-based for
                     // normal heroes, but a boss is meant to have them for the whole fight.
                     foreach (var power in state.ActivePowers)
