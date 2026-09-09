@@ -17,6 +17,13 @@ namespace BLTAdoptAHero
         private Dictionary<string, string> _kingdomUpgrades = new();
         private Dictionary<string, float> _troopSpawnAccumulation = new();
 
+        /// <summary>
+        /// Queued upgrade purchases, one encoded entry per line (see UpgradeAction.QueueEntry).
+        /// A viewer books an upgrade they cannot yet afford and it buys itself the moment their
+        /// gold reaches the price, so they do not have to sit and watch their balance.
+        /// </summary>
+        private List<string> _upgradeQueue = new();
+
         private GlobalCommonConfig ConfigSafe => GlobalCommonConfig.Get();
 
         /// <summary>
@@ -47,7 +54,27 @@ namespace BLTAdoptAHero
         {
             CampaignEvents.DailyTickClanEvent.AddNonSerializedListener(this, OnDailyTickClan);
             CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this, OnDailyTickSettlement);
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, OnHourlyTick);
         }
+
+        private void OnHourlyTick()
+        {
+            if (_upgradeQueue == null || _upgradeQueue.Count == 0) return;
+            try
+            {
+                BLTAdoptAHero.Actions.UpgradeAction.ProcessQueue(this);
+            }
+            catch (Exception ex)
+            {
+                Log($"Upgrade queue tick error: {ex.Message}");
+            }
+        }
+
+        #region Upgrade queue
+        public List<string> GetQueue() => _upgradeQueue ??= new List<string>();
+
+        public void SetQueue(List<string> entries) => _upgradeQueue = entries ?? new List<string>();
+        #endregion
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -55,6 +82,8 @@ namespace BLTAdoptAHero
             dataStore.SyncData("BLT_ClanUpgrades", ref _clanUpgrades);
             dataStore.SyncData("BLT_KingdomUpgrades", ref _kingdomUpgrades);
             dataStore.SyncData("BLT_TroopSpawnAccumulation", ref _troopSpawnAccumulation);
+            dataStore.SyncData("BLT_UpgradeQueue", ref _upgradeQueue);
+            _upgradeQueue ??= new List<string>();
 
             _fiefUpgrades ??= new Dictionary<string, string>();
             _clanUpgrades ??= new Dictionary<string, string>();

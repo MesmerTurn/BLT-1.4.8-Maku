@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -375,15 +375,20 @@ namespace BLTAdoptAHero.Actions
             if (Mission.Current != null) { onFailure("{=BLT_NoMission}Cannot use this command during a mission".Translate()); return; }
             if (context.Args.IsEmpty())
             {
-                onFailure("Usage:  [auto|bulk] <fief|clan|kingdom> [all|allk] <name> <upgrade>  |  info <fief|clan|kingdom> <name>  |  list [fief|clan|kingdom]  |  remove <fief|clan|kingdom> <name> <upgrade>");
+                onFailure("Usage:  [auto|bulk] <fief|clan|kingdom> [all|allk] <name> <upgrade>  |  info <fief|clan|kingdom> <name>  |  list [fief|clan|kingdom]  |  queue <fief|clan|kingdom> [name] <upgrade> | queue list | queue clear  |  remove <fief|clan|kingdom> <name> <upgrade>");
                 return;
             }
 
             // Push the accumulation setting to the behavior so daily ticks respect it immediately.
             if (UpgradeBehavior.Current != null)
+            {
                 UpgradeBehavior.Current.AccumulateWhenFull = settings.AccumulateWhenFull;
-                UpgradeBehavior.Current.IndependentClansCountAsLords = settings.IndependentClansCountAsLords;  // ← add
-                UpgradeBehavior.Current.IndependentClansCountAsMercs = settings.IndependentClansCountAsMercs;  // ← add
+                UpgradeBehavior.Current.IndependentClansCountAsLords = settings.IndependentClansCountAsLords;
+                UpgradeBehavior.Current.IndependentClansCountAsMercs = settings.IndependentClansCountAsMercs;
+            }
+
+            // Remember the settings so the hourly queue runner applies the same rules.
+            lastSettings = settings;
 
             var globalConfig = GlobalCommonConfig.Get();
             if (globalConfig == null) { onFailure("Configuration not available"); return; }
@@ -431,6 +436,13 @@ namespace BLTAdoptAHero.Actions
                 string type = cleanArgs[1].ToLowerInvariant();
                 string name = string.Join(" ", cleanArgs.Skip(2));
                 HandleInfoCommand(type, name, adoptedHero, globalConfig, onSuccess, onFailure);
+                return;
+            }
+
+            // ── queue ───────────────────────────────────────────────────────────
+            if (command == "queue")
+            {
+                HandleQueueCommand(cleanArgs, adoptedHero, autoBuy, onSuccess, onFailure);
                 return;
             }
 
@@ -892,6 +904,9 @@ namespace BLTAdoptAHero.Actions
             public string UpgradeId;
             public string UpgradeName; // display name from config
             public string Message;     // failure reason when !Success
+            // True when the only thing standing in the way is the hero's purse (or influence).
+            // The queue uses this to tell "come back later" apart from "this will never work".
+            public bool Unaffordable;
         }
 
         private List<PurchaseResult> ExecuteFiefChain(Settlement settlement, List<string> chain, Hero hero, GlobalCommonConfig gc, HashSet<string> alreadyOwned)
@@ -906,7 +921,7 @@ namespace BLTAdoptAHero.Actions
 
                 int gold = BLTAdoptAHeroCampaignBehavior.Current.GetHeroGold(hero);
                 if (gold < up.GoldCost)
-                { results.Add(new PurchaseResult { UpgradeId = id, UpgradeName = up.Name, Success = false, Message = Naming.NotEnoughGold(up.GoldCost, gold) }); return results; }
+                { results.Add(new PurchaseResult { UpgradeId = id, UpgradeName = up.Name, Success = false, Message = Naming.NotEnoughGold(up.GoldCost, gold), Unaffordable = true }); return results; }
 
                 if (up.CapitalOnly)
                 {
@@ -992,7 +1007,7 @@ namespace BLTAdoptAHero.Actions
                 var up = gc.ClanUpgrades.FirstOrDefault(u => u.ID == id);
                 if (up == null) { results.Add(new PurchaseResult { UpgradeId = id, Success = false, Message = $"Upgrade '{id}' not found" }); return results; }
                 int gold = BLTAdoptAHeroCampaignBehavior.Current.GetHeroGold(hero);
-                if (gold < up.GoldCost) { results.Add(new PurchaseResult { UpgradeId = id, Success = false, Message = Naming.NotEnoughGold(up.GoldCost, gold) }); return results; }
+                if (gold < up.GoldCost) { results.Add(new PurchaseResult { UpgradeId = id, Success = false, Message = Naming.NotEnoughGold(up.GoldCost, gold), Unaffordable = true }); return results; }
                 BLTAdoptAHeroCampaignBehavior.Current.ChangeHeroGold(hero, -up.GoldCost, true);
                 UpgradeBehavior.Current?.AddClanUpgrade(clan, id);
                 owned.Add(id);
@@ -1055,10 +1070,10 @@ namespace BLTAdoptAHero.Actions
                 var up = gc.KingdomUpgrades.FirstOrDefault(u => u.ID == id);
                 if (up == null) { results.Add(new PurchaseResult { UpgradeId = id, Success = false, Message = $"Upgrade '{id}' not found" }); return results; }
                 int gold = BLTAdoptAHeroCampaignBehavior.Current.GetHeroGold(hero);
-                if (gold < up.GoldCost) { results.Add(new PurchaseResult { UpgradeId = id, Success = false, Message = Naming.NotEnoughGold(up.GoldCost, gold) }); return results; }
+                if (gold < up.GoldCost) { results.Add(new PurchaseResult { UpgradeId = id, Success = false, Message = Naming.NotEnoughGold(up.GoldCost, gold), Unaffordable = true }); return results; }
                 if (up.InfluenceCost > 0 && hero.Clan.Influence < up.InfluenceCost)
                 {
-                    results.Add(new PurchaseResult { UpgradeId = id, Success = false, Message = $"Not enough influence (need {up.InfluenceCost}, have {(int)hero.Clan.Influence})" });
+                    results.Add(new PurchaseResult { UpgradeId = id, Success = false, Message = $"Not enough influence (need {up.InfluenceCost}, have {(int)hero.Clan.Influence})", Unaffordable = true });
                     return results;
                 }
                 BLTAdoptAHeroCampaignBehavior.Current.ChangeHeroGold(hero, -up.GoldCost, true);
@@ -1084,6 +1099,9 @@ namespace BLTAdoptAHero.Actions
         {
             var bought = results.Where(r => r.Success).ToList();
             var blocked = results.FirstOrDefault(r => !r.Success);
+
+            // A queued purchase that merely ran out of money stays in the queue.
+            if (queueRunActive && blocked?.Unaffordable == true) queueRunUnaffordable = true;
 
             if (bought.Count == 0)
             {
@@ -1176,6 +1194,184 @@ namespace BLTAdoptAHero.Actions
         // ════════════════════════════════════════════════════════════════════════
         // Name lookups
         // ════════════════════════════════════════════════════════════════════════
+
+        // ════════════════════════════════════════════════════════════════════════
+        // Auto-buy queue
+        // ════════════════════════════════════════════════════════════════════════
+        //
+        // A viewer books an upgrade they cannot afford yet. Every game hour the queue
+        // retries the booking against their current purse; the moment the gold is there
+        // the upgrade buys itself, so nobody has to sit refreshing their balance.
+        // Entries are stored on UpgradeBehavior so they survive a save/load.
+
+        private class QueueEntry
+        {
+            public string HeroName;
+            public string Type;        // fief | clan | kingdom
+            public string TargetName;  // settlement name, empty for clan/kingdom
+            public string UpgradeId;
+            public bool AutoBuy;       // buy the prerequisite chain too
+
+            public string Encode() => string.Join("|",
+                HeroName, Type, TargetName ?? "", UpgradeId, AutoBuy ? "1" : "0");
+
+            public static QueueEntry Decode(string s)
+            {
+                var p = s?.Split('|');
+                if (p == null || p.Length < 5) return null;
+                return new QueueEntry
+                {
+                    HeroName = p[0], Type = p[1],
+                    TargetName = string.IsNullOrWhiteSpace(p[2]) ? null : p[2],
+                    UpgradeId = p[3], AutoBuy = p[4] == "1",
+                };
+            }
+
+            public string Describe() => TargetName != null
+                ? $"{UpgradeId} for {TargetName}"
+                : $"{UpgradeId} ({Type})";
+        }
+
+        /// <summary>
+        /// The settings from the most recent !upgrade command, reused by the queue so that
+        /// queued purchases respect the same permission rules as typed ones.
+        /// </summary>
+        private static Settings lastSettings;
+
+        /// <summary>Set by the chain executors while a queued purchase is running.</summary>
+        private static bool queueRunUnaffordable;
+        private static bool queueRunActive;
+
+        private void HandleQueueCommand(string[] cleanArgs, Hero hero, bool autoBuy,
+            Action<string> ok, Action<string> fail)
+        {
+            var behavior = UpgradeBehavior.Current;
+            if (behavior == null) { fail("Upgrade system not ready"); return; }
+
+            string sub = cleanArgs.Length > 1 ? cleanArgs[1].ToLowerInvariant() : "";
+
+            if (sub is "" or "list")
+            {
+                var mine = behavior.GetQueue()
+                    .Select(QueueEntry.Decode).Where(e => e != null)
+                    .Where(e => e.HeroName == hero.Name?.ToString())
+                    .ToList();
+                if (mine.Count == 0) { ok("Your upgrade queue is empty"); return; }
+                ok("Queued: " + string.Join(", ", mine.Select(e => e.Describe())));
+                return;
+            }
+
+            if (sub == "clear")
+            {
+                var all = behavior.GetQueue();
+                int before = all.Count;
+                all.RemoveAll(s => QueueEntry.Decode(s)?.HeroName == hero.Name?.ToString());
+                behavior.SetQueue(all);
+                ok(before == all.Count ? "Nothing was queued" : $"Cleared {before - all.Count} queued upgrade(s)");
+                return;
+            }
+
+            // queue <fief|clan|kingdom> [name] <upgradeId>
+            if (sub != "fief" && sub != "clan" && sub != "kingdom")
+            {
+                fail("Usage: queue <fief|clan|kingdom> [settlement] <upgrade_id>  |  queue list  |  queue clear");
+                return;
+            }
+
+            if (cleanArgs.Length < 3) { fail($"Usage: queue {sub} " + (sub == "fief" ? "<settlement> " : "") + "<upgrade_id>"); return; }
+
+            var entry = new QueueEntry
+            {
+                HeroName = hero.Name?.ToString(),
+                Type = sub,
+                UpgradeId = cleanArgs.Last(),
+                AutoBuy = autoBuy,
+                TargetName = sub == "fief" && cleanArgs.Length > 3
+                    ? string.Join(" ", cleanArgs.Skip(2).Take(cleanArgs.Length - 3))
+                    : null,
+            };
+
+            if (sub == "fief" && entry.TargetName == null)
+            { fail("Usage: queue fief <settlement> <upgrade_id>"); return; }
+
+            var queue = behavior.GetQueue();
+            if (queue.Any(s =>
+                {
+                    var e = QueueEntry.Decode(s);
+                    return e != null && e.HeroName == entry.HeroName && e.Type == entry.Type
+                        && e.UpgradeId.Equals(entry.UpgradeId, OIC)
+                        && string.Equals(e.TargetName, entry.TargetName, StringComparison.OrdinalIgnoreCase);
+                }))
+            { fail("That upgrade is already in your queue"); return; }
+
+            queue.Add(entry.Encode());
+            behavior.SetQueue(queue);
+            ok($"Queued {entry.Describe()} — it will buy itself once you can afford it");
+        }
+
+        /// <summary>
+        /// Called once per game hour. Retries every queued purchase; entries that only failed
+        /// for lack of gold or influence stay in the queue, everything else is dropped with a
+        /// message so the viewer is not left waiting on something that can never succeed.
+        /// </summary>
+        public static void ProcessQueue(UpgradeBehavior behavior)
+        {
+            if (behavior == null) return;
+            var gc = GlobalCommonConfig.Get();
+            if (gc == null) return;
+
+            var settings = lastSettings ?? new Settings();
+            var runner = new UpgradeAction();
+            var queue = behavior.GetQueue();
+            var remaining = new List<string>();
+
+            foreach (var raw in queue.ToList())
+            {
+                var entry = QueueEntry.Decode(raw);
+                if (entry == null) continue;
+
+                var hero = BLTAdoptAHeroCampaignBehavior.Current?.GetAdoptedHero(entry.HeroName);
+                if (hero == null || hero.IsDead)
+                {
+                    // Hero is gone; there is nobody left to buy it for.
+                    continue;
+                }
+
+                string failure = null;
+                queueRunActive = true;
+                queueRunUnaffordable = false;
+                try
+                {
+                    runner.HandlePurchaseCommand(entry.Type, entry.TargetName, entry.UpgradeId,
+                        hero, settings, gc, entry.AutoBuy, false, false,
+                        _ => { }, msg => failure = msg);
+                }
+                catch (Exception ex)
+                {
+                    failure = ex.Message;
+                }
+                finally
+                {
+                    queueRunActive = false;
+                }
+
+                if (queueRunUnaffordable)
+                {
+                    // Ran out of gold part-way (or before starting) — try again next hour.
+                    remaining.Add(raw);
+                }
+                else if (failure == null)
+                {
+                    Log.LogFeedResponse(entry.HeroName, $"Queued upgrade purchased: {entry.Describe()}");
+                }
+                else
+                {
+                    Log.LogFeedResponse(entry.HeroName, $"Queued upgrade cancelled ({entry.Describe()}): {failure}");
+                }
+            }
+
+            behavior.SetQueue(remaining);
+        }
 
         private Settlement FindSettlement(string name)
         {

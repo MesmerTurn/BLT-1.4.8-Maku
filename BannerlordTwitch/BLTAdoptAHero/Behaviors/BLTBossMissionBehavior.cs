@@ -218,10 +218,16 @@ namespace BLTAdoptAHero
             // One independent roll per boss slot, up to the configured cap - the old version only
             // ever had two candidate sides in a list, so "Max Bosses Per Battle" above 2 could
             // never actually be reached. Each slot that rolls a rarity also picks its own side.
-            int slots = Math.Max(1, cfg.BossMaxPerBattle);
+            // Sieges get their own cap. A siege is a longer, denser fight with far more bodies on
+            // screen than a field battle, so the number that feels right there is not the number
+            // that feels right in an open-field skirmish. Set to 0 to just use the general cap.
+            int cap = isSiege && cfg.BossMaxPerSiege > 0 ? cfg.BossMaxPerSiege : cfg.BossMaxPerBattle;
+            cap = Math.Max(1, cap);
+
+            int slots = cap;
             for (int i = 0; i < slots; i++)
             {
-                if (bosses.Count >= cfg.BossMaxPerBattle) break;
+                if (bosses.Count >= cap) break;
                 var rarity = RollRarity();
                 if (rarity == null) continue;
 

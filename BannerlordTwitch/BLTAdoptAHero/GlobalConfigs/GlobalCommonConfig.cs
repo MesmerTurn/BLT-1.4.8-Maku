@@ -84,6 +84,12 @@ namespace BLTAdoptAHero
          PropertyOrder(4), Range(1, 6), UsedImplicitly]
         public int BossMaxPerBattle { get; set; } = 2;
 
+        [LocDisplayName("{=}Max Bosses Per Siege"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=}Separate cap for sieges only. A siege is a longer fight with far more troops on the field than a skirmish, so it can carry more bosses than an open battle should. Set to 0 to use the general Max Bosses Per Battle instead."),
+         PropertyOrder(5), Range(0, 10), UsedImplicitly]
+        public int BossMaxPerSiege { get; set; } = 0;
+
         // These are independent percentages, not relative weights - checked rarest-first
         // (Legendary, then Epic, then Common) so only one can trigger per roll. Whatever's left
         // over (100 - Legendary - Epic - Common) is the chance of no boss at all that roll.
