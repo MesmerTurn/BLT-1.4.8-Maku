@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Text;
 using System.Collections.Generic;
@@ -508,7 +508,7 @@ namespace BLTAdoptAHero.Actions
                               ?? adoptedHero.CharacterObject?.Culture
                               ?? Clan.PlayerClan?.Culture
                               ?? Settlement.All.FirstOrDefault(s => s.Culture != null)?.Culture;
-            newClan.Banner = Banner.CreateRandomBanner();
+            newClan.Banner = BLTBannerSanitizerBehavior.CreateSafeBanner();
             //newClan.Initialize(new TextObject(fullClanName), new TextObject(fullClanName), clanCulture, clanBanner);
             newClan.Kingdom = null;
             newClan.AddRenown(settings.Renown, false);

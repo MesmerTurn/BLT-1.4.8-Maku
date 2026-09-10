@@ -121,7 +121,7 @@ namespace BLTAdoptAHero
                            ?? hero.CharacterObject?.Culture
                            ?? Clan.PlayerClan?.Culture
                            ?? Settlement.All.FirstOrDefault(s => s.Culture != null)?.Culture;
-            clan.Banner = Banner.CreateRandomBanner();
+            clan.Banner = BLTBannerSanitizerBehavior.CreateSafeBanner();
             clan.Kingdom = null;
             clan.AddRenown(renown, false);
             clan.SetInitialHomeSettlement(
