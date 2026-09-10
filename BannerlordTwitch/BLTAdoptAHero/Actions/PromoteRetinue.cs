@@ -166,7 +166,12 @@ namespace BLTAdoptAHero
 
                 if (asLord)
                 {
-                    BLTTroopAscension.MakeLordOfNewClan(newHero, settings.LordRenown, 0);
+                    // The new lord joins whatever kingdom the viewer is in at this moment - the
+                    // troop was theirs, so the lord it becomes owes them allegiance. Works the
+                    // same whether that is a base-game kingdom or one a viewer founded through
+                    // BLT. A viewer with no kingdom still produces an independent clan, as before.
+                    BLTTroopAscension.MakeLordOfNewClan(
+                        newHero, settings.LordRenown, 0, adoptedHero.Clan?.Kingdom);
                 }
                 else
                 {

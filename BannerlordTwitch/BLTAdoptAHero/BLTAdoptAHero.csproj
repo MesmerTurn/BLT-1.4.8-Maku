@@ -406,6 +406,8 @@
     <Compile Include="Actions\PromoteRetinue.cs" />
     <Compile Include="Actions\Util\BossNamePool.cs" />
     <Compile Include="Behaviors\BLTBossMissionBehavior.cs" />
+    <Compile Include="Behaviors\BLTBossSiegeMemory.cs" />
+    <Compile Include="Behaviors\BLTCompanionGrowthBehavior.cs" />
     <Compile Include="Behaviors\BLTBountyBehavior.cs" />
     <Compile Include="Behaviors\BLTNemesisBehavior.cs" />
     <Compile Include="Behaviors\BLTTroopAscensionBehavior.cs" />

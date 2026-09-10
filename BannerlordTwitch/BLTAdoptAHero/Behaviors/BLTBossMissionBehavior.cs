@@ -200,6 +200,17 @@ namespace BLTAdoptAHero
             if (hasRolled) return;
             hasRolled = true;
 
+            // A siege is fought in waves, can be reloaded, and can be resumed the next day, and
+            // every one of those starts a fresh mission that would roll fresh bosses. Beating
+            // them once counts for the whole siege, so succeeding is not punished with having to
+            // do it again.
+            string siegeKey = isSiege && cfg.BossOncePerSiege ? BLTBossSiegeMemory.CurrentSiegeKey() : null;
+            if (siegeKey != null && BLTBossSiegeMemory.Current?.HasSpawnedFor(siegeKey) == true)
+            {
+                Log.LogFeedSystem("[Boss] Skipped: this siege has already had its bosses.");
+                return;
+            }
+
             float commonPct = isSiege ? cfg.BossCommonWeightSiege : cfg.BossCommonWeightFieldBattle;
             float epicPct = isSiege ? cfg.BossEpicWeightSiege : cfg.BossEpicWeightFieldBattle;
             float legendaryPct = isSiege ? cfg.BossLegendaryWeightSiege : cfg.BossLegendaryWeightFieldBattle;
@@ -235,6 +246,11 @@ namespace BLTAdoptAHero
                 var side = onPlayerSide ? Mission.Current.PlayerTeam : Mission.Current.PlayerEnemyTeam;
                 SpawnBoss(side, onPlayerSide, rarity.Value, cfg);
             }
+
+            // Recorded only once bosses actually made it into the fight. A roll that produced
+            // none must not spend the siege, or a quiet first wave would rule out every later one.
+            if (siegeKey != null && bosses.Count > 0)
+                BLTBossSiegeMemory.Current?.MarkSpawnedFor(siegeKey);
         }
 
         // onPlayerSide is passed in rather than re-derived from the team: Team.IsPlayerAlly depends

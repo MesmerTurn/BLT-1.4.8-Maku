@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -89,6 +89,24 @@ namespace BLTAdoptAHero
          LocDescription("{=}Separate cap for sieges only. A siege is a longer fight with far more troops on the field than a skirmish, so it can carry more bosses than an open battle should. Set to 0 to use the general Max Bosses Per Battle instead."),
          PropertyOrder(5), Range(0, 10), UsedImplicitly]
         public int BossMaxPerSiege { get; set; } = 0;
+
+        [LocDisplayName("{=BossOnceSiege}Bosses Only Once Per Siege"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossOnceSiegeDesc}A siege is fought in waves, can be reloaded, and can be resumed the next day, and each of those starts a fresh battle that would roll fresh bosses. With this on, beating the bosses once counts for the whole siege. A later siege of the same settlement gets its own bosses. Field battles are unaffected."),
+         PropertyOrder(6), UsedImplicitly]
+        public bool BossOncePerSiege { get; set; } = true;
+
+        [LocDisplayName("{=CompBattleXp}Companion XP Per Battle"),
+         LocCategory("XP", "{=06KnYhyh}XP"),
+         LocDescription("{=CompBattleXpDesc}Skill XP given to a viewer's companions for each battle they fight in. An adopted hero earns from the channel and from their own kills; a promoted companion has neither, so without this they stay at the level of the troop they were promoted from while the hero they follow pulls away. Goes into a skill behind a weapon they actually carry, plus a quarter of it into a supporting skill. 0 disables it."),
+         Range(0, 20000), PropertyOrder(20), UsedImplicitly]
+        public int CompanionBattleXp { get; set; } = 0;
+
+        [LocDisplayName("{=CompBattleWin}Companion XP Win Multiplier"),
+         LocCategory("XP", "{=06KnYhyh}XP"),
+         LocDescription("{=CompBattleWinDesc}Multiplies the battle XP when their side won. Losing still pays the base amount - a battle survived teaches plenty - so this is a bonus for winning rather than a penalty for losing. 1 pays the same either way."),
+         Range(1, 5), PropertyOrder(21), UsedImplicitly]
+        public float CompanionBattleXpWinBonus { get; set; } = 1.5f;
 
         // These are independent percentages, not relative weights - checked rarest-first
         // (Legendary, then Epic, then Common) so only one can trigger per roll. Whatever's left

@@ -109,7 +109,8 @@ namespace BLTAdoptAHero
         /// the kill-promotion above and the !promote command, so both produce the same kind of
         /// lord. Mirrors the clan setup in ClanManagement, which is proven to work in this build.
         /// </summary>
-        public static void MakeLordOfNewClan(Hero hero, int renown, int startingGold)
+        public static void MakeLordOfNewClan(Hero hero, int renown, int startingGold,
+            Kingdom joinKingdom = null)
         {
             string clanName = "{=}Clan of {NAME}".Translate(("NAME", hero.Name.ToString()));
             var clan = Clan.CreateClan(clanName);
@@ -139,6 +140,26 @@ namespace BLTAdoptAHero
             catch (Exception ex) { Log.Error($"[TroopAscension] Could not set home settlement: {ex.Message}"); }
             clan.IsNoble = true;
             CampaignEventDispatcher.Instance.OnClanCreated(clan, false);
+
+            // Promoted through a viewer, the new lord serves whoever that viewer serves. Done
+            // after OnClanCreated so the kingdom receives a clan the campaign already knows
+            // about, and through ChangeKingdomAction rather than by assigning Clan.Kingdom, so
+            // the kingdom's own bookkeeping runs. A BLT-made kingdom and a base-game one are the
+            // same kind of object here, so neither needs special handling.
+            if (joinKingdom != null)
+            {
+                try
+                {
+                    // Never: this is a sworn lord of the viewer's realm, not a mercenary on a
+                    // contract that runs out and leaves them free to wander off.
+                    ChangeKingdomAction.ApplyByJoinToKingdom(
+                        clan, joinKingdom, CampaignTime.Never, false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error($"[TroopAscension] Could not put {hero.Name} into {joinKingdom.Name}: {ex.Message}");
+                }
+            }
 
             if (startingGold > 0) hero.ChangeHeroGold(startingGold);
         }
