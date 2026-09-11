@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using BannerlordTwitch.Util;
 using HarmonyLib;
@@ -40,6 +41,130 @@ namespace BannerlordTwitch
 
         public static string DocumentationPath => Path.Combine(DocumentationRootDir, "index.html");
 
+        // ════════════════════════════════════════════════════════════════════════
+        //  Readability
+        // ════════════════════════════════════════════════════════════════════════
+        //
+        // The generated page is a reference of fifty-odd commands, sixteen classes and several
+        // hundred configuration values. It is written to be looked things up in, but until now
+        // the only way to find anything was to scroll, which is why it reads as a wall. A search
+        // box that hides everything not matching turns the same page into something answerable.
+        //
+        // Deliberately plain JavaScript with no libraries: this file is uploaded to static hosts
+        // like Neocities, often opened offline, and a dependency on a CDN is a dependency that
+        // will one day be down.
+
+        private const string SearchStyles = @"<style>
+.blt-search{position:sticky;top:0;z-index:50;padding:10px 0;margin:0 0 12px;
+  background:inherit;backdrop-filter:blur(2px)}
+.blt-search input{width:100%;box-sizing:border-box;padding:10px 14px;font-size:16px;
+  border:2px solid currentColor;border-radius:4px;background:transparent;color:inherit;
+  font-family:inherit}
+.blt-search .blt-hint{font-size:12px;opacity:.7;margin-top:4px}
+.blt-hidden{display:none!important}
+.blt-top{position:fixed;right:16px;bottom:16px;z-index:60;padding:8px 12px;
+  text-decoration:none;border:2px solid currentColor;border-radius:4px;
+  background:inherit;font-size:18px;line-height:1}
+.blt-suggest{margin:14px 0;padding:12px 16px;border:2px dashed currentColor;border-radius:4px}
+.blt-suggest a{font-weight:bold}
+@media print{.blt-search,.blt-top{display:none}}
+</style>";
+
+        private const string SearchBoxHtml = @"<div class=""blt-search"">
+  <input id=""bltFilter"" type=""search"" autocomplete=""off""
+         placeholder=""Search commands, classes, settings..."" aria-label=""Search this page"">
+  <div class=""blt-hint"" id=""bltCount"">Type to filter. Clear the box to see everything again.</div>
+</div>";
+
+        // Filters by hiding whole sections that do not match, so a hit keeps the heading it
+        // belongs under - a matching row with no heading above it tells the reader nothing.
+        private const string SearchScript = @"<script>
+(function () {
+  var box = document.getElementById('bltFilter');
+  var note = document.getElementById('bltCount');
+  if (!box) return;
+
+  var sections = [];
+  var headings = document.querySelectorAll('h2, h3');
+  for (var i = 0; i < headings.length; i++) {
+    var head = headings[i];
+    var block = [head];
+    var node = head.nextElementSibling;
+    while (node && node.tagName !== 'H2' && node.tagName !== 'H3') {
+      block.push(node);
+      node = node.nextElementSibling;
+    }
+    sections.push({ nodes: block, text: (head.textContent + ' ' + block.map(function (n) {
+      return n.textContent || '';
+    }).join(' ')).toLowerCase() });
+  }
+
+  function apply() {
+    var q = box.value.trim().toLowerCase();
+    var shown = 0;
+    for (var i = 0; i < sections.length; i++) {
+      var hit = q === '' || sections[i].text.indexOf(q) !== -1;
+      if (hit) shown++;
+      for (var j = 0; j < sections[i].nodes.length; j++) {
+        sections[i].nodes[j].classList.toggle('blt-hidden', !hit);
+      }
+    }
+    note.textContent = q === ''
+      ? 'Type to filter. Clear the box to see everything again.'
+      : (shown === 0
+          ? 'Nothing matches “' + q + '”.'
+          : shown + ' section(s) match “' + q + '”.');
+  }
+
+  var pending;
+  box.addEventListener('input', function () {
+    clearTimeout(pending);
+    pending = setTimeout(apply, 120);
+  });
+  box.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { box.value = ''; apply(); }
+  });
+})();
+</script>";
+
+        /// <summary>
+        /// An optional suggestion link in the generated docs.
+        ///
+        /// Read from "suggestions-url.txt" beside the mod DLL rather than baked in, the same way
+        /// streamers.txt already works, so each streamer points it at their own form without a
+        /// rebuild - and anyone who has no form gets no broken button.
+        /// </summary>
+        private static string SuggestionBoxHtml()
+        {
+            try
+            {
+                string path = Path.Combine(
+                    Path.GetDirectoryName(typeof(DocumentationGenerator).Assembly.Location) ?? ".",
+                    "suggestions-url.txt");
+
+                if (!File.Exists(path)) return string.Empty;
+
+                string url = File.ReadAllLines(path)
+                    .Select(l => l.Trim())
+                    .FirstOrDefault(l => l.StartsWith("http", StringComparison.OrdinalIgnoreCase));
+
+                if (string.IsNullOrEmpty(url)) return string.Empty;
+
+                // The URL is the streamer's own, from a file on their machine, but it still ends
+                // up inside an attribute - so quotes and angle brackets go out encoded.
+                string safe = url.Replace("&", "&amp;").Replace("\"", "&quot;")
+                                 .Replace("<", "&lt;").Replace(">", "&gt;");
+
+                return $"<div class=\"blt-suggest\">Got an idea, or found something broken? " +
+                       $"<a href=\"{safe}\" target=\"_blank\" rel=\"noopener\">Suggest something for BLT</a></div>";
+            }
+            catch
+            {
+                // A missing or unreadable file must not cost the streamer their documentation.
+                return string.Empty;
+            }
+        }
+
         public async Task SaveAsync(string title, string introduction, bool addTOC = true)
         {
             // Wait for image writes first
@@ -60,18 +185,27 @@ namespace BannerlordTwitch
 
                 content.InsertRange(0, new[]
                 {
-                    "<!DOCTYPE html><html>",
+                    "<!DOCTYPE html><html lang=\"en\">",
                     "<head>",
                     "<meta charset=\"utf-8\"/>",
+                    // Without this the page renders at desktop width on a phone, and every
+                    // viewer reading this on their phone gets a wall of unreadable tiny text.
+                    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>",
+                    $"<title>{title}</title>",
                     "<link rel=\"stylesheet\" href=\"style.css\">",
+                    SearchStyles,
                     "</head>",
                     "<body>",
                     "<div class=\"content\">",
                     $"<h1>{title}</h1>",
-                    $"<p>{introduction}</p>"
+                    $"<p>{introduction}</p>",
+                    SuggestionBoxHtml(),
+                    SearchBoxHtml,
                 });
 
-                content.Add("</div></html></body>");
+                content.Add(SearchScript);
+                content.Add("<a href=\"#\" class=\"blt-top\" title=\"Back to top\">&#8679;</a>");
+                content.Add("</div></body></html>");
 
                 try
                 {
