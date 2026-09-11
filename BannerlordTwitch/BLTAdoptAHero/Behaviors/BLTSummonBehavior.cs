@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -119,6 +119,9 @@ namespace BLTAdoptAHero
                 {
                     var formationClass = agent.Formation.FormationIndex;
                     SpawnRetinue(adoptedHero, ShouldBeMounted(formationClass), formationClass,
+                        heroSummonState, heroSummonState.WasPlayerSide);
+
+                    SpawnCompanions(adoptedHero, ShouldBeMounted(formationClass), formationClass,
                         heroSummonState, heroSummonState.WasPlayerSide);
                 }
 
@@ -267,6 +270,86 @@ namespace BLTAdoptAHero
                     }
                 }
             });
+        }
+
+        /// <summary>
+        /// Brings a viewer's companions into the battle alongside them.
+        ///
+        /// Asked for by Maku, who suspected companions were not actually turning up - and they
+        /// were not. Promoting retinue to a companion made a real hero and attached them to the
+        /// viewer's clan, but nothing ever spawned them into a mission: only retinue troops were.
+        /// So a companion existed on paper, cost gold, and then sat out every battle the viewer
+        /// fought. The battle XP added for companions was landing on people who were never there.
+        ///
+        /// Only the clan leader brings the clan's companions. Several viewers can share a clan,
+        /// and without that rule each of them would summon the same companions again, duplicating
+        /// them across the field.
+        /// </summary>
+        private static void SpawnCompanions(Hero adoptedHero, bool ownerIsMounted,
+            FormationClass ownerFormationClass, HeroSummonState existingHero, bool onPlayerSide)
+        {
+            try
+            {
+                var cfg = BLTAdoptAHeroModule.CommonConfig;
+                if (cfg?.SummonCompanions != true) return;
+
+                var clan = adoptedHero.Clan;
+                if (clan == null || clan.Leader != adoptedHero) return;
+
+                var companions = clan.Companions?
+                    .Where(c => c != null && !c.IsDead && c != adoptedHero)
+                    .Where(c => c.PartyBelongedTo == null || c.PartyBelongedTo == adoptedHero.PartyBelongedTo)
+                    .ToList();
+
+                if (companions == null || companions.Count == 0) return;
+
+                int limit = cfg.MaxCompanionsSummoned;
+                if (limit > 0 && companions.Count > limit) companions = companions.Take(limit).ToList();
+
+                bool mounted = Mission.Current.Mode != MissionMode.Stealth
+                               && !MissionHelpers.InSiegeMission()
+                               && ownerIsMounted;
+
+                bool deploymentFlag = Mission.Current.Mode is MissionMode.Deployment;
+
+                foreach (var companion in companions)
+                {
+                    var troop = companion.CharacterObject;
+                    if (troop == null) continue;
+
+                    if (onPlayerSide && cfg.RetinueUseHeroesFormation)
+                        Campaign.Current.SetPlayerFormationPreference(troop, ownerFormationClass);
+
+                    existingHero.Party.MemberRoster.AddToCounts(troop, 1);
+
+                    var agent = SpawnAgent(onPlayerSide, troop, existingHero.Party,
+                        troop.IsMounted && mounted, false, !deploymentFlag);
+
+                    if (agent == null) continue;
+
+                    // Kills by a companion pay their viewer, the same way a retinue kill does -
+                    // the companion is theirs, and it is their gold that bought them.
+                    BLTAdoptAHeroCustomMissionBehavior.Current.AddListeners(agent,
+                        onGotAKill: (killer, killed, state) =>
+                        {
+                            BLTAdoptAHeroCommonMissionBehavior.Current.ApplyKillEffects(
+                                adoptedHero, killer, killed, state,
+                                cfg.RetinueGoldPerKill,
+                                cfg.RetinueHealPerKill,
+                                0, 1,
+                                cfg.RelativeLevelScaling,
+                                cfg.LevelScalingCap,
+                                cfg.MinimumGoldPerKill);
+                        });
+
+                    Log.Trace($"[Summon] Brought companion {companion.Name} in with {adoptedHero.FirstName}.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // A companion that fails to arrive must not cost the viewer their own summon.
+                Log.Exception($"{nameof(BLTSummonBehavior)}.{nameof(SpawnCompanions)}", ex);
+            }
         }
 
         private static void SpawnRetinue(Hero adoptedHero, bool ownerIsMounted, FormationClass ownerFormationClass,

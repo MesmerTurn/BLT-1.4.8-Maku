@@ -361,6 +361,18 @@ namespace BLTAdoptAHero
          PropertyOrder(42), UsedImplicitly]
         public bool BossMythicDropsSet { get; set; } = true;
 
+        [LocDisplayName("{=SummonComp}Summon Companions With Hero"),
+         LocCategory("General", "{=C5T5nnix}General"),
+         LocDescription("{=SummonCompDesc}Brings a viewer's companions into the battle alongside them. Without this a companion exists on paper, costs gold, and then sits out every battle their viewer fights. Only the clan leader brings the clan's companions, so viewers sharing a clan do not each summon the same ones."),
+         PropertyOrder(30), UsedImplicitly]
+        public bool SummonCompanions { get; set; } = true;
+
+        [LocDisplayName("{=MaxComp}Max Companions Summoned"),
+         LocCategory("General", "{=C5T5nnix}General"),
+         LocDescription("{=MaxCompDesc}Most companions brought in per summon. 0 brings all of them."),
+         Range(0, 20), PropertyOrder(31), UsedImplicitly]
+        public int MaxCompanionsSummoned { get; set; } = 0;
+
         [LocDisplayName("{=}Never Flees"),
          LocCategory("Boss", "{=}Boss"),
          LocDescription("{=}Keep the boss fighting no matter how badly its side is losing. Without this a boss inherits the morale of the army around it and can break and run, which ends the fight it was supposed to be the centrepiece of."),
