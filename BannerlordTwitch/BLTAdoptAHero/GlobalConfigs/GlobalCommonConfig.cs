@@ -265,6 +265,72 @@ namespace BLTAdoptAHero
          PropertyOrder(27), UsedImplicitly]
         public string BossLegendaryBarColor { get; set; } = "#FF8000F0"; // orange/gold
 
+        // ── Mythic ────────────────────────────────────────────────────────────────
+        // The rarest tier. Where the others are one class made tougher, a Mythic draws on
+        // several of the streamer's classes at once and gets every power in them, so it fights
+        // with a breadth no single class can - and hits hard enough that a line of troops is not
+        // an answer to it on its own.
+
+        [LocDisplayName("{=BossMythicWeightFB}Mythic Chance (Field Battle)"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicWeightFBDesc}Percent chance per boss slot of a Mythic in a field battle. Rolled before every other rarity, so this is the rarest thing that can appear. Keep it low - a Mythic is meant to be an event, not a fixture."),
+         Range(0, 100), PropertyOrder(30), UsedImplicitly]
+        public float BossMythicWeightFieldBattle { get; set; } = 1f;
+
+        [LocDisplayName("{=BossMythicWeightS}Mythic Chance (Siege)"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicWeightSDesc}Percent chance per boss slot of a Mythic in a siege."),
+         Range(0, 100), PropertyOrder(31), UsedImplicitly]
+        public float BossMythicWeightSiege { get; set; } = 1f;
+
+        [LocDisplayName("{=BossMythicClasses}Mythic Class Count"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicClassesDesc}How many of the streamer's classes a Mythic draws its powers from. It receives every power in each of them, active and passive alike, rather than the first few - that is what makes this tier different in kind and not just in numbers. Capped by how many classes are configured."),
+         Range(1, 6), PropertyOrder(32), UsedImplicitly]
+        public int BossMythicClassCount { get; set; } = 3;
+
+        [LocDisplayName("{=BossMythicHp}Mythic Health Multiplier"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicHpDesc}Health multiplier for a Mythic. Health is stored by the engine in 16 bits, so the result is capped at 30000 however high this goes."),
+         Range(1, 100), PropertyOrder(33), UsedImplicitly]
+        public float BossMythicHpMultiplier { get; set; } = 40f;
+
+        [LocDisplayName("{=BossMythicArmor}Mythic Armor Multiplier"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicArmorDesc}Armor multiplier for a Mythic."),
+         Range(1, 10), PropertyOrder(34), UsedImplicitly]
+        public float BossMythicArmorMultiplier { get; set; } = 4f;
+
+        [LocDisplayName("{=BossMythicScale}Mythic Size"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicScaleDesc}How large a Mythic stands relative to a normal soldier."),
+         Range(1, 3), PropertyOrder(35), UsedImplicitly]
+        public float BossMythicScale { get; set; } = 1.9f;
+
+        [LocDisplayName("{=BossMythicBar}Mythic Bar Colour"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicBarDesc}Health bar colour for a Mythic, as #AARRGGBB."),
+         PropertyOrder(36), UsedImplicitly]
+        public string BossMythicBarColor { get; set; } = "#FFFF2020"; // deep red
+
+        [LocDisplayName("{=BossMythicShockR}Mythic Shockwave Radius"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicShockRDesc}When a Mythic lands a melee hit, everyone hostile to it within this many metres is knocked off their feet. 0 turns the shockwave off and leaves the Mythic an ordinary, if very strong, fighter."),
+         Range(0, 20), PropertyOrder(37), UsedImplicitly]
+        public float BossMythicShockwaveRadius { get; set; } = 6f;
+
+        [LocDisplayName("{=BossMythicShockD}Mythic Shockwave Damage"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicShockDDesc}Damage dealt to each soldier caught by the shockwave. Blunt damage, so it knocks men down rather than cutting them apart - the point of it is to break a line, not to wipe one out in a swing."),
+         Range(0, 200), PropertyOrder(38), UsedImplicitly]
+        public int BossMythicShockwaveDamage { get; set; } = 25;
+
+        [LocDisplayName("{=BossMythicShockCd}Mythic Shockwave Cooldown (seconds)"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicShockCdDesc}Minimum time between shockwaves. Without a gap a Mythic swinging into a crowd would knock the same men down every swing and they would never stand up again."),
+         Range(0, 60), PropertyOrder(39), UsedImplicitly]
+        public float BossMythicShockwaveCooldown { get; set; } = 4f;
+
         [LocDisplayName("{=}Never Flees"),
          LocCategory("Boss", "{=}Boss"),
          LocDescription("{=}Keep the boss fighting no matter how badly its side is losing. Without this a boss inherits the morale of the army around it and can break and run, which ends the fight it was supposed to be the centrepiece of."),

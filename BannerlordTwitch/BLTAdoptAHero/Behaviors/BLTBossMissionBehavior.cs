@@ -24,6 +24,9 @@ namespace BLTAdoptAHero
         Common,
         Epic,
         Legendary,
+        // The rarest tier: draws powers from several classes at once rather than one, and knocks
+        // men off their feet where it swings.
+        Mythic,
     }
 
     // Random boss spawning, per the "!focusmelee etc" chat thread with siemanko_smialy/mrudd/
@@ -46,6 +49,8 @@ namespace BLTAdoptAHero
             public string DisplayName;
             public float MaxHealth;
             public bool Dead;
+            // When this boss last let off a shockwave, so it cannot re-floor the same men every swing.
+            public float LastShockwave = float.NegativeInfinity;
             // Signature particle effect for this figure, kept so it can be stopped when the boss
             // dies - otherwise the emitter outlives the corpse.
             public AgentPfx Pfx;
@@ -214,12 +219,14 @@ namespace BLTAdoptAHero
             float commonPct = isSiege ? cfg.BossCommonWeightSiege : cfg.BossCommonWeightFieldBattle;
             float epicPct = isSiege ? cfg.BossEpicWeightSiege : cfg.BossEpicWeightFieldBattle;
             float legendaryPct = isSiege ? cfg.BossLegendaryWeightSiege : cfg.BossLegendaryWeightFieldBattle;
+            float mythicPct = isSiege ? cfg.BossMythicWeightSiege : cfg.BossMythicWeightFieldBattle;
 
             var rng = new Random();
 
             BossRarity? RollRarity()
             {
                 // Rarest first - only one can trigger per roll.
+                if (rng.NextDouble() * 100.0 < mythicPct) return BossRarity.Mythic;
                 if (rng.NextDouble() * 100.0 < legendaryPct) return BossRarity.Legendary;
                 if (rng.NextDouble() * 100.0 < epicPct) return BossRarity.Epic;
                 if (rng.NextDouble() * 100.0 < commonPct) return BossRarity.Common;
@@ -385,18 +392,21 @@ namespace BLTAdoptAHero
             {
                 BossRarity.Common => cfg.BossCommonHpMultiplier,
                 BossRarity.Epic => cfg.BossEpicHpMultiplier,
+                BossRarity.Mythic => cfg.BossMythicHpMultiplier,
                 _ => cfg.BossLegendaryHpMultiplier,
             };
             float armorMult = rarity switch
             {
                 BossRarity.Common => cfg.BossCommonArmorMultiplier,
                 BossRarity.Epic => cfg.BossEpicArmorMultiplier,
+                BossRarity.Mythic => cfg.BossMythicArmorMultiplier,
                 _ => cfg.BossLegendaryArmorMultiplier,
             };
             float scale = rarity switch
             {
                 BossRarity.Common => cfg.BossCommonScale,
                 BossRarity.Epic => cfg.BossEpicScale,
+                BossRarity.Mythic => cfg.BossMythicScale,
                 _ => cfg.BossLegendaryScale,
             };
             int powerCount = rarity switch
@@ -457,7 +467,9 @@ namespace BLTAdoptAHero
                 Rarity = rarity,
                 DisplayName = nameEntry.FullName,
                 MaxHealth = agent.HealthLimit,
-                ActivePowers = ForceUnlockPowers(hero, classDef, powerCount),
+                ActivePowers = rarity == BossRarity.Mythic
+                    ? ForceUnlockAllPowersFromClasses(hero, classDef, classDefs, cfg.BossMythicClassCount)
+                    : ForceUnlockPowers(hero, classDef, powerCount),
             };
             bosses.Add(state);
 
@@ -604,6 +616,72 @@ namespace BLTAdoptAHero
             return custom.CreateArmorModifier(name, power);
         }
 
+        /// <summary>
+        /// Every power from several classes at once, active and passive alike.
+        ///
+        /// The other tiers are one class with bigger numbers behind it. A Mythic is meant to be
+        /// different in kind: it fights with a breadth no single class of the streamer's has, so
+        /// no one build is the answer to it. Classes are drawn at random and the boss's own class
+        /// is always among them, so its gear and its powers still belong together.
+        /// </summary>
+        private static List<IHeroPowerActive> ForceUnlockAllPowersFromClasses(
+            Hero hero, HeroClassDef ownClass, List<HeroClassDef> allClasses, int classCount)
+        {
+            var activated = new List<IHeroPowerActive>();
+
+            try
+            {
+                var chosen = new List<HeroClassDef>();
+                if (ownClass != null) chosen.Add(ownClass);
+
+                foreach (var c in (allClasses ?? new List<HeroClassDef>())
+                             .Where(c => c != null && c != ownClass)
+                             .OrderBy(_ => MBRandom.RandomFloat))
+                {
+                    if (chosen.Count >= Math.Max(1, classCount)) break;
+                    chosen.Add(c);
+                }
+
+                // Two classes can carry the same power, and granting one twice is at best wasted
+                // and at worst a doubled effect.
+                var seenPassive = new HashSet<object>();
+                var seenActive = new HashSet<object>();
+
+                foreach (var classDef in chosen)
+                {
+                    foreach (var item in classDef.PassivePower?.ValidPowers
+                                         ?? Enumerable.Empty<PassivePowerGroupItem>())
+                    {
+                        var power = item.Power;
+                        if (power == null || !seenPassive.Add(power)) continue;
+
+                        BLTHeroPowersMissionBehavior.PowerHandler?.ConfigureHandlers(
+                            hero, power as HeroPowerDefBase,
+                            handlers => power.OnHeroJoinedBattle(hero, handlers));
+                    }
+
+                    foreach (var item in classDef.ActivePower?.ValidPowers
+                                         ?? Enumerable.Empty<ActivePowerGroupItem>())
+                    {
+                        var power = item.Power;
+                        if (power == null || !seenActive.Add(power)) continue;
+
+                        power.Activate(hero, () => { });
+                        activated.Add(power);
+                    }
+                }
+
+                Log.Trace($"[Boss] Mythic drew every power from {chosen.Count} class(es): " +
+                          string.Join(", ", chosen.Select(c => c.Name?.ToString() ?? "?")));
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"[Boss] Mythic power unlock failed: {ex.Message}");
+            }
+
+            return activated;
+        }
+
         private static List<IHeroPowerActive> ForceUnlockPowers(Hero hero, HeroClassDef classDef, int count)
         {
             var activated = new List<IHeroPowerActive>();
@@ -689,6 +767,67 @@ namespace BLTAdoptAHero
                             power.Activate(state.Hero, () => { });
                     }
                 }
+            });
+        }
+
+        /// <summary>
+        /// A Mythic's shockwave: when it lands a melee hit, everyone hostile to it standing close
+        /// by is knocked off their feet.
+        ///
+        /// Deliberately hung off a landed hit rather than run on a timer, so it reads as the
+        /// force of the blow rather than as something going off on its own. Blunt damage, because
+        /// the point is to break a line rather than to delete one in a single swing - men get up
+        /// again. The cooldown matters more than it looks: without it, a Mythic swinging into a
+        /// crowd re-floors the same soldiers every swing and they never stand up at all.
+        /// </summary>
+        public override void OnAgentHit(Agent affectedAgent, Agent affectorAgent,
+            in MissionWeapon affectorWeapon, in Blow blow, in AttackCollisionData attackCollisionData)
+        {
+            SafeCall(() =>
+            {
+                var cfg = BLTAdoptAHeroModule.CommonConfig;
+                if (cfg == null || cfg.BossMythicShockwaveRadius <= 0f) return;
+                if (affectorAgent == null || !affectorAgent.IsActive()) return;
+
+                var state = bosses.FirstOrDefault(b =>
+                    b != null && !b.Dead && b.Rarity == BossRarity.Mythic && b.Agent == affectorAgent);
+                if (state == null) return;
+
+                if (missionTime - state.LastShockwave < cfg.BossMythicShockwaveCooldown) return;
+                state.LastShockwave = missionTime;
+
+                float radiusSq = cfg.BossMythicShockwaveRadius * cfg.BossMythicShockwaveRadius;
+                var origin = affectorAgent.Position;
+                int caught = 0;
+
+                foreach (var target in Mission.Current.Agents.ToList())
+                {
+                    if (target == null || target == affectorAgent) continue;
+                    if (!target.IsHuman || !target.IsActive()) continue;
+                    if (!target.IsEnemyOf(affectorAgent)) continue;
+                    if (target.Position.DistanceSquared(origin) > radiusSq) continue;
+
+                    var shock = new Blow(affectorAgent.Index)
+                    {
+                        DamageType = DamageTypes.Blunt,
+                        BoneIndex = target.Monster?.ThoraxLookDirectionBoneIndex ?? 0,
+                        GlobalPosition = target.Position,
+                        BaseMagnitude = cfg.BossMythicShockwaveDamage,
+                        InflictedDamage = cfg.BossMythicShockwaveDamage,
+                        // What actually puts them on the ground; the damage alone would only
+                        // stagger a well-armoured soldier.
+                        BlowFlag = BlowFlags.KnockDown,
+                    };
+                    shock.SwingDirection = (target.Position - origin).NormalizedCopy();
+                    shock.Direction = shock.SwingDirection;
+
+                    var collision = default(AttackCollisionData);
+                    target.RegisterBlow(shock, in collision);
+                    caught++;
+                }
+
+                if (caught > 0)
+                    Log.Trace($"[Boss] {state.DisplayName} shockwave floored {caught} soldier(s).");
             });
         }
 
@@ -861,7 +1000,8 @@ namespace BLTAdoptAHero
                 {
                     BossRarity.Common => cfg.BossCommonBarColor,
                     BossRarity.Epic => cfg.BossEpicBarColor,
-                    _ => cfg.BossLegendaryBarColor,
+                    BossRarity.Mythic => cfg.BossMythicBarColor,
+                _ => cfg.BossLegendaryBarColor,
                 };
             }
 
