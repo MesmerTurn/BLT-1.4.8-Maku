@@ -409,6 +409,7 @@
     <Compile Include="Behaviors\BLTBossSiegeMemory.cs" />
     <Compile Include="Behaviors\BLTCompanionGrowthBehavior.cs" />
     <Compile Include="Behaviors\BLTBannerSanitizerBehavior.cs" />
+    <Compile Include="Behaviors\BLTSiegeAssaultBehavior.cs" />
     <Compile Include="Behaviors\BLTBountyBehavior.cs" />
     <Compile Include="Behaviors\BLTNemesisBehavior.cs" />
     <Compile Include="Behaviors\BLTTroopAscensionBehavior.cs" />

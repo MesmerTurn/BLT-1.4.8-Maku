@@ -331,6 +331,36 @@ namespace BLTAdoptAHero
          Range(0, 60), PropertyOrder(39), UsedImplicitly]
         public float BossMythicShockwaveCooldown { get; set; } = 4f;
 
+        [LocDisplayName("{=SiegeWalls}Send Idle Heroes To The Walls"),
+         LocCategory("CampaignFeatures", "{=CampFeat}Campaign Features"),
+         LocDescription("{=SiegeWallsDesc}In a siege, an attacking formation hands out the ladders, towers and ram when the assault begins. A hero summoned after that joins a formation whose work is already divided up, gets no share of it, and stands at the spawn doing nothing. With this on, a hero who has genuinely stopped moving is sent at the walls - or the gate, when no way up can be found. Heroes who are fighting, climbing or advancing are never touched."),
+         PropertyOrder(14), UsedImplicitly]
+        public bool SiegeSendHeroesToWalls { get; set; } = false;
+
+        [LocDisplayName("{=SiegeIdle}Seconds Idle Before Sending"),
+         LocCategory("CampaignFeatures", "{=CampFeat}Campaign Features"),
+         LocDescription("{=SiegeIdleDesc}How long a hero must stand still in a siege before being given their own orders. Too low and it will interrupt someone waiting their turn at a ladder; too high and they spend the assault standing at the spawn."),
+         Range(2, 60), PropertyOrder(15), UsedImplicitly]
+        public float SiegeIdleSecondsBeforeOrder { get; set; } = 12f;
+
+        [LocDisplayName("{=BossDropChanceM}Mythic Drop Chance"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossDropChanceMDesc}Percent chance that a Mythic gives up its gear to whoever lands the killing blow."),
+         Range(0, 100), PropertyOrder(40), UsedImplicitly]
+        public float BossDropChanceMythic { get; set; } = 100f;
+
+        [LocDisplayName("{=BossDropPowerM}Mythic Drop Power"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossDropPowerMDesc}How strong the modifier on a Mythic's dropped gear is."),
+         Range(0, 10), PropertyOrder(41), UsedImplicitly]
+        public int BossDropPowerMythic { get; set; } = 5;
+
+        [LocDisplayName("{=BossMythicSet}Mythic Drops A Whole Set"),
+         LocCategory("Boss", "{=}Boss"),
+         LocDescription("{=BossMythicSetDesc}A Mythic gives up a matching set rather than a single piece - everything it wore, or everything it carried, decided per kill. Never both at once: that would hand a viewer a finished character in one fight and leave nothing to want from the next one. Turn off to have Mythics drop one piece like the other tiers."),
+         PropertyOrder(42), UsedImplicitly]
+        public bool BossMythicDropsSet { get; set; } = true;
+
         [LocDisplayName("{=}Never Flees"),
          LocCategory("Boss", "{=}Boss"),
          LocDescription("{=}Keep the boss fighting no matter how badly its side is losing. Without this a boss inherits the morale of the army around it and can break and run, which ends the fight it was supposed to be the centrepiece of."),

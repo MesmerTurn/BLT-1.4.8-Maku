@@ -41,7 +41,7 @@ namespace BLTAdoptAHero.Actions
                 generator.Value("- a number - move to that formation");
                 generator.Value("- front / back - take a place in the front or the back rank");
                 generator.Value("- detach / attach - leave the line, or rejoin it");
-                generator.Value("- (while detached) charge / hold / follow / gate / walls");
+                generator.Value("- (while detached) charge (or engage) / hold / follow / gate / walls");
                 generator.Value("- help - the short version of this list, in chat");
             }
         }
@@ -49,7 +49,7 @@ namespace BLTAdoptAHero.Actions
         public override Type HandlerConfigType => typeof(Settings);
 
         private static readonly string[] DetachKeywords =
-            { "detach", "attach", "charge", "hold", "follow", "gate", "walls" };
+            { "detach", "attach", "charge", "engage", "hold", "follow", "gate", "walls" };
 
         protected override void ExecuteInternal(Hero adoptedHero, ReplyContext context, object config,
             Action<string> onSuccess, Action<string> onFailure)
@@ -127,7 +127,7 @@ namespace BLTAdoptAHero.Actions
         {
             var sb = new StringBuilder("Formation: (empty) list, <number> move, front/back place in rank");
             if (settings.Detach)
-                sb.Append(", detach/attach leave or rejoin, then charge/hold/follow/gate/walls");
+                sb.Append(", detach/attach leave or rejoin, then charge (or engage)/hold/follow/gate/walls");
             return sb.ToString();
         }
 
@@ -164,7 +164,9 @@ namespace BLTAdoptAHero.Actions
             {
                 "detach" => behavior.Detach(agent),
                 "attach" => behavior.Attach(agent),
-                "charge" => behavior.Charge(agent),
+                // engage reads more naturally than charge to a lot of people, and asking a
+                // viewer to remember which of two words the mod happens to use is a poor trade.
+                "charge" or "engage" => behavior.Charge(agent),
                 "hold" => behavior.Hold(agent),
                 "follow" => behavior.Follow(agent),
                 "gate" => behavior.TargetDoor(agent),
@@ -180,7 +182,7 @@ namespace BLTAdoptAHero.Actions
         {
             "detach" => "You have left the formation and take your own orders now",
             "attach" => "You have rejoined your formation",
-            "charge" => "Charging",
+            "charge" or "engage" => "Charging the nearest enemy",
             "hold" => "Holding position",
             "follow" => "Following",
             "gate" => "Heading for the gate",

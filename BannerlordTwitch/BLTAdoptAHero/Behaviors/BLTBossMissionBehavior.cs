@@ -530,6 +530,72 @@ namespace BLTAdoptAHero
         ///
         /// Common bosses never drop: a trophy that drops from everything is not a trophy.
         /// </summary>
+        /// <summary>
+        /// A Mythic's whole kit, rather than one piece of it.
+        ///
+        /// Which half of the kit is decided per kill: everything it wore, or everything it
+        /// carried. A Mythic that gave up both at once would hand a viewer a finished character
+        /// in a single fight and leave nothing to want from the next one.
+        ///
+        /// The viewer's custom item limit is honoured piece by piece rather than checked once:
+        /// running out of room part way should leave them with what fits, not nothing.
+        /// </summary>
+        private static void DropBossSet(Hero killer, BossState state, int power, GlobalCommonConfig cfg)
+        {
+            bool armourSet = MBRandom.RandomFloat < 0.5f;
+
+            var pieces = new List<ItemObject>();
+            foreach (var slot in state.Hero.BattleEquipment.YieldFilledEquipmentSlots())
+            {
+                var item = slot.element.Item;
+                if (item == null) continue;
+                if (item.IsMountable) continue;                    // the mount is not a trophy
+                if (item.PrimaryWeapon?.IsAmmo == true) continue;   // nor is a quiver
+
+                bool isWeapon = item.PrimaryWeapon != null;
+                if (armourSet == isWeapon) continue;
+
+                pieces.Add(item);
+            }
+
+            if (pieces.Count == 0) return;
+
+            var campaign = BLTAdoptAHeroCampaignBehavior.Current;
+            int limit = BLTAdoptAHeroModule.CommonConfig.CustomItemLimit;
+            int granted = 0;
+
+            foreach (var piece in pieces)
+            {
+                var owned = campaign.GetCustomItems(killer);
+                if (owned != null && owned.Count >= limit) break;
+
+                var modifier = MakeModifier(piece, state.DisplayName + "'s {ITEMNAME}", power);
+                if (modifier == null) continue;
+
+                campaign.AddCustomItem(killer, new EquipmentElement(piece, modifier));
+                granted++;
+            }
+
+            if (granted == 0)
+            {
+                Log.LogFeedEvent("{=}{KILLER} had no room for {BOSS}'s gear!"
+                    .Translate(("KILLER", killer.Name.ToString()), ("BOSS", state.DisplayName)));
+                return;
+            }
+
+            Log.LogFeedEvent("{=}{KILLER} claimed {BOSS}'s {KIND} - {COUNT} piece(s)!"
+                .Translate(("KILLER", killer.Name.ToString()),
+                           ("BOSS", state.DisplayName),
+                           ("KIND", armourSet ? "armour" : "weapons"),
+                           ("COUNT", granted)));
+
+            if (granted < pieces.Count)
+            {
+                Log.LogFeedEvent("{=}{KILLER} could not carry the rest of it."
+                    .Translate(("KILLER", killer.Name.ToString())));
+            }
+        }
+
         private static void TryDropBossItem(Hero killer, BossState state, GlobalCommonConfig cfg)
         {
             try
@@ -540,6 +606,10 @@ namespace BLTAdoptAHero
                 int power;
                 switch (state.Rarity)
                 {
+                    case BossRarity.Mythic:
+                        chance = cfg.BossDropChanceMythic;
+                        power = cfg.BossDropPowerMythic;
+                        break;
                     case BossRarity.Legendary:
                         chance = cfg.BossDropChanceLegendary;
                         power = cfg.BossDropPowerLegendary;
@@ -553,6 +623,14 @@ namespace BLTAdoptAHero
                 }
 
                 if (MBRandom.RandomFloat * 100f >= chance) return;
+
+                // A Mythic gives up a matching set rather than a single piece - the whole reason
+                // to fight one rather than run from it.
+                if (state.Rarity == BossRarity.Mythic && cfg.BossMythicDropsSet)
+                {
+                    DropBossSet(killer, state, power, cfg);
+                    return;
+                }
 
                 // Respect the viewer's custom item limit, or a few boss kills would fill their
                 // inventory with trophies they cannot get rid of.
