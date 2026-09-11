@@ -161,6 +161,17 @@ namespace BLTAdoptAHero
             var cfg = GlobalCommonConfig.Get();
             if (cfg?.BossEnabled != true) return;
 
+            // Second line of defence on the deployment phase. The tick already holds the roll
+            // back, but this is the method that actually puts an armed agent on the field, and
+            // it must not do that while the player is still arranging troops who cannot fight
+            // back. Deliberately does not consume the roll.
+            if (Mission.Current == null
+                || Mission.Current.Mode == MissionMode.Deployment
+                || !Mission.Current.IsDeploymentFinished)
+            {
+                return;
+            }
+
             // Only field battles and sieges. InFieldBattleMission() alone is NOT enough of a
             // gate: it's just Mission.IsFieldBattle, and the engine flags tournaments as field
             // battles too - which let a boss spawn into a tournament and then hard-crashed, since
@@ -791,6 +802,22 @@ namespace BLTAdoptAHero
         {
             SafeCall(() =>
             {
+                // Deployment is not the battle. The player is still placing their formations,
+                // their men are standing where they were put, and nothing is allowed to swing
+                // yet - except a boss, which spawned straight into that and started killing.
+                // Reported by Maku twice: "they killed my men again in deploying step".
+                //
+                // The roll is not consumed here, and the clock is held at zero, so the spawn
+                // delay below measures from the moment the battle actually begins rather than
+                // from the start of a deployment phase that can last minutes.
+                if (Mission.Current == null
+                    || Mission.Current.Mode == MissionMode.Deployment
+                    || !Mission.Current.IsDeploymentFinished)
+                {
+                    missionTime = 0f;
+                    return;
+                }
+
                 missionTime += dt;
                 if (hasRolled || missionTime < SpawnDelaySeconds) return;
 
