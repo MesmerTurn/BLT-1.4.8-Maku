@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -40,7 +40,8 @@ namespace BLTAdoptAHero.Actions
          CategoryOrder("Armies", 7),
          CategoryOrder("Release", 8),
          CategoryOrder("Expel", 9),
-         CategoryOrder("Tax", 10)]
+         CategoryOrder("Tax", 10),
+         CategoryOrder("Sponsor", 11)]
         private class Settings : IDocumentable
         {
             [LocDisplayName("{=pYjIUlTE}Enabled"),
@@ -327,6 +328,30 @@ namespace BLTAdoptAHero.Actions
              Range(0f, 100f)]
             public float MaxTaxRate { get; set; } = 50f;
 
+            [LocDisplayName("{=SponsorOn}Enable Sponsor"),
+             LocCategory("Sponsor", "{=SponsorCat}Sponsor"),
+             LocDescription("{=SponsorOnDesc}Lets a viewer buy influence for their clan with gold, so someone with money but no battles behind them can still push their kingdom's politics."),
+             PropertyOrder(1), UsedImplicitly]
+            public bool SponsorEnabled { get; set; } = true;
+
+            [LocDisplayName("{=SponsorRate}Gold Per Influence"),
+             LocCategory("Sponsor", "{=SponsorCat}Sponsor"),
+             LocDescription("{=SponsorRateDesc}Gold charged for one point of influence. Influence is worth a great deal in kingdom politics, so this wants to be expensive."),
+             Range(1, 1000000), PropertyOrder(2), UsedImplicitly]
+            public int SponsorGoldPerInfluence { get; set; } = 1000;
+
+            [LocDisplayName("{=SponsorMax}Max Influence Per Command"),
+             LocCategory("Sponsor", "{=SponsorCat}Sponsor"),
+             LocDescription("{=SponsorMaxDesc}The most influence a single sponsor command may buy. A hard ceiling on top of the gold check, so no combination of a huge chat number and a large gold-per-influence value can reach the arithmetic limits at all."),
+             Range(1, 10000), PropertyOrder(3), UsedImplicitly]
+            public int SponsorMaxInfluencePerCommand { get; set; } = 500;
+
+            [LocDisplayName("{=SponsorCut}King's Cut"),
+             LocCategory("Sponsor", "{=SponsorCat}Sponsor"),
+             LocDescription("{=SponsorCutDesc}Share of the gold spent that is forwarded to the kingdom's ruler, 0 to 1. At 0.25 the king receives a quarter of every sponsorship."),
+             Range(0f, 1f), PropertyOrder(4), UsedImplicitly]
+            public float SponsorKingCutPercent { get; set; } = 0.25f;
+
             public void GenerateDocumentation(IDocumentationGenerator generator)
             {
                 var EnabledCommands = new StringBuilder();
@@ -491,6 +516,9 @@ namespace BLTAdoptAHero.Actions
                     break;
                 case "armies":
                     HandleArmiesCommand(settings, adoptedHero, desiredName, onSuccess, onFailure);
+                    break;
+                case "sponsor":
+                    HandleSponsorCommand(settings, adoptedHero, desiredName, onSuccess, onFailure);
                     break;
                 case "tax":
                     HandleTaxCommand(settings, adoptedHero, desiredName, onSuccess, onFailure);
@@ -1511,6 +1539,107 @@ namespace BLTAdoptAHero.Actions
             Log.ShowInformation($"{adoptedHero.Name} has set {adoptedHero.Clan.Kingdom.Name} tax rate to {newRate:F1}%!", adoptedHero.CharacterObject);
         }
 
+        /// <summary>
+        /// Buys influence for the viewer's clan with their own gold.
+        ///
+        /// This command existed before and was removed, because the cost was worked out by
+        /// multiplying a number typed in chat by the gold-per-influence setting as a plain int.
+        /// A viewer typing a large enough number overflowed Int32 and the cost came out
+        /// NEGATIVE - which sailed past the "can you afford it" check, because positive gold is
+        /// never less than a negative number, and then paid them roughly 1.29 billion gold
+        /// instead of charging them. The king's cut overflowed the same way and drained the king.
+        ///
+        /// It is back with three separate defences rather than one: a hard cap on how much a
+        /// single command may buy, the multiplication done in long, and a rejection of anything
+        /// that would not fit safely back into the int the rest of BLT uses. The cap alone makes
+        /// the overflow unreachable; the other two are there because a setting can be edited.
+        /// </summary>
+        private void HandleSponsorCommand(Settings settings, Hero adoptedHero, string args,
+            Action<string> onSuccess, Action<string> onFailure)
+        {
+            if (!settings.SponsorEnabled)
+            {
+                onFailure("{=SponsorOff}Sponsoring is disabled".Translate());
+                return;
+            }
+
+            var clan = adoptedHero.Clan;
+            var kingdom = clan?.Kingdom;
+
+            if (kingdom == null)
+            {
+                onFailure("{=SponsorNoKingdom}You must belong to a kingdom to sponsor it".Translate());
+                return;
+            }
+            if (clan.IsUnderMercenaryService)
+            {
+                onFailure("{=SponsorMerc}Mercenary clans cannot sponsor a kingdom".Translate());
+                return;
+            }
+            if (kingdom.Leader == adoptedHero)
+            {
+                onFailure("{=SponsorKing}A ruler cannot sponsor their own kingdom - use the tax system instead".Translate());
+                return;
+            }
+
+            if (!int.TryParse(args?.Trim(), out int influence) || influence <= 0)
+            {
+                onFailure($"Usage: sponsor <amount> - {settings.SponsorGoldPerInfluence}{Naming.Gold} per influence, up to {settings.SponsorMaxInfluencePerCommand} at a time");
+                return;
+            }
+
+            int maxPerCommand = Math.Max(1, settings.SponsorMaxInfluencePerCommand);
+            if (influence > maxPerCommand)
+            {
+                onFailure($"You may buy at most {maxPerCommand} influence at a time");
+                return;
+            }
+            if (settings.SponsorGoldPerInfluence <= 0)
+            {
+                onFailure("The gold-per-influence setting is invalid, tell the streamer");
+                return;
+            }
+
+            long costLong = (long)influence * settings.SponsorGoldPerInfluence;
+            if (costLong > int.MaxValue / 2)
+            {
+                onFailure("That would cost more gold than the game can count");
+                return;
+            }
+
+            int cost = (int)costLong;
+            int gold = BLTAdoptAHeroCampaignBehavior.Current.GetHeroGold(adoptedHero);
+            if (gold < cost)
+            {
+                onFailure(Naming.NotEnoughGold(cost, gold));
+                return;
+            }
+
+            BLTAdoptAHeroCampaignBehavior.Current.ChangeHeroGold(adoptedHero, -cost, true);
+            clan.Influence += influence;
+
+            // The ruler takes a share, which is what makes this sponsorship rather than a vending
+            // machine: the gold goes somewhere in the world instead of vanishing.
+            var king = kingdom.Leader;
+            int kingCut = 0;
+            if (king != null && king != adoptedHero && settings.SponsorKingCutPercent > 0f)
+            {
+                kingCut = (int)(cost * settings.SponsorKingCutPercent);
+                if (kingCut > 0)
+                {
+                    if (king.IsAdopted())
+                        BLTAdoptAHeroCampaignBehavior.Current.ChangeHeroGold(king, kingCut, true);
+                    else
+                        king.Gold += kingCut;
+                }
+            }
+
+            // A kingdom can be between rulers, and naming a leader that is not there would throw
+            // on the success message - after the gold had already changed hands.
+            onSuccess(kingCut > 0 && king != null
+                ? $"Bought {influence} influence for {clan.Name} for {cost}{Naming.Gold} - {king.Name} received {kingCut}{Naming.Gold}"
+                : $"Bought {influence} influence for {clan.Name} for {cost}{Naming.Gold}");
+        }
         private void HandlePolicyCommand(Settings settings, Hero adoptedHero, string desiredName, Action<string> onSuccess, Action<string> onFailure)
         {
             var desiredPolicy = PolicyObject.All.FirstOrDefault(c => c.Name.ToString().IndexOf(desiredName, StringComparison.OrdinalIgnoreCase) >= 0);
