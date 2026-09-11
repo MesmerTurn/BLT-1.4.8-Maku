@@ -134,6 +134,110 @@ namespace BLTAdoptAHero.Behaviors
     }
 
     /// <summary>
+    /// Stops a birth from killing the campaign every day.
+    ///
+    /// Reported by Maku: NullReferenceException in
+    /// Helpers.EquipmentHelper.AssignHeroEquipmentFromEquipment, reached from
+    /// HeroCreator.DeliverOffSpring through PregnancyCampaignBehavior.CheckOffspringToDeliver.
+    /// A child is being born and the game is dressing it from an equipment template that is not
+    /// there - which happens when a parent came from a character template that carries no usable
+    /// equipment, exactly what promoted troops and created heroes are made from. It sits on the
+    /// daily hero tick, so it repeats every day until the pregnancy is resolved.
+    ///
+    /// Swallowed at the dressing step rather than at the birth: the child is still delivered and
+    /// still exists, it just starts with whatever equipment it already had. A newborn has no use
+    /// for gear anyway, and losing a child's starting outfit is a far smaller loss than losing
+    /// the child - or the campaign.
+    /// </summary>
+    [HarmonyPatch]
+    public static class ChildEquipmentCrashGuard
+    {
+        private static IEnumerable<MethodBase> FindTargets() =>
+            new[] { "Helpers.EquipmentHelper" }
+                .Select(AccessTools.TypeByName)
+                .Where(t => t != null)
+                .Select(t => AccessTools.DeclaredMethod(t, "AssignHeroEquipmentFromEquipment"))
+                .Where(m => m != null)
+                .Cast<MethodBase>();
+
+        static bool Prepare() => FindTargets().Any();
+
+        static IEnumerable<MethodBase> TargetMethods() => FindTargets();
+
+        private static readonly HashSet<string> Reported = new();
+
+        static Exception Finalizer(Exception __exception, Hero __0)
+        {
+            if (__exception == null) return null;
+
+            try
+            {
+                string id = __0?.StringId ?? "<null hero>";
+                if (Reported.Add(id))
+                {
+                    Log.Error(
+                        $"[BirthGuard] Could not dress '{__0?.Name}' ({id}); they keep the equipment they had. " +
+                        $"culture={__0?.Culture?.StringId ?? "NULL"}, " +
+                        $"mother={__0?.Mother?.Name?.ToString() ?? "NULL"}, " +
+                        $"father={__0?.Father?.Name?.ToString() ?? "NULL"}, " +
+                        $"clan={__0?.Clan?.Name?.ToString() ?? "NULL"}, " +
+                        $"template={__0?.CharacterObject?.StringId ?? "NULL"} " +
+                        $":: {__exception.GetType().Name}: {__exception.Message}");
+                }
+            }
+            catch
+            {
+                // Never let the reporting be what breaks the tick.
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Backstop one level up, in case a birth throws from somewhere other than the dressing step.
+    /// That pregnancy is left unresolved for the day rather than the campaign stopping.
+    /// </summary>
+    [HarmonyPatch]
+    public static class PregnancyCrashGuard
+    {
+        private static IEnumerable<MethodBase> FindTargets() =>
+            new[] { "PregnancyCampaignBehavior" }
+                .Select(AccessTools.TypeByName)
+                .Where(t => t != null)
+                .Select(t => AccessTools.DeclaredMethod(t, "CheckOffspringToDeliver"))
+                .Where(m => m != null)
+                .Cast<MethodBase>();
+
+        static bool Prepare() => FindTargets().Any();
+
+        static IEnumerable<MethodBase> TargetMethods() => FindTargets();
+
+        private static bool reported;
+
+        static Exception Finalizer(Exception __exception)
+        {
+            if (__exception == null) return null;
+
+            try
+            {
+                if (!reported)
+                {
+                    reported = true;
+                    Log.Error($"[BirthGuard] A delivery crashed and was left for another day " +
+                              $":: {__exception.GetType().Name}: {__exception.Message}");
+                }
+            }
+            catch
+            {
+                // Never let the reporting be what breaks the tick.
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Stops a settlement claim election from killing the campaign every day.
     ///
     /// Reported by Maku as an infinite crash: NullReferenceException in

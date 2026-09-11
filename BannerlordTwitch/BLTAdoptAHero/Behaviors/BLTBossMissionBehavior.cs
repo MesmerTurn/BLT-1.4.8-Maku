@@ -295,6 +295,15 @@ namespace BLTAdoptAHero
             if (hero == null) return;
             hero.ChangeState(Hero.CharacterStates.Active);
             hero.SetName(new TaleWorlds.Localization.TextObject(nameEntry.FullName), new TaleWorlds.Localization.TextObject(nameEntry.FullName));
+
+            // Bosses are built from wanderer templates, which is what makes them a real hero the
+            // engine is willing to spawn as an agent - but a wanderer is also exactly what the
+            // game offers in taverns as a companion for hire. Reported by Maku: the bosses he
+            // fought turned up as recruitable companions afterwards. Taking them out of the
+            // wanderer occupation keeps them off that list; surviving bosses are also retired at
+            // the end of the mission, below.
+            try { hero.SetNewOccupation(Occupation.NotAssigned); }
+            catch (Exception ex) { Log.Trace($"[Boss] Could not set occupation: {ex.Message}"); }
             // Deliberately NOT calling BLTAdoptAHeroCampaignBehavior.Current.SetIsCreatedHero -
             // this hero is never tracked as an adopted BLT hero.
 
@@ -733,6 +742,23 @@ namespace BLTAdoptAHero
 
         protected override void OnEndMission()
         {
+            // A boss that survived the battle is still a live hero in the campaign afterwards,
+            // wandering the world and available to be recruited. They exist for one fight, so
+            // they are retired at the end of it: disabled rather than killed, because killing
+            // them would push a death through every system that reacts to one - the encyclopedia,
+            // relations, and the kill feed - for someone who was never really part of the world.
+            SafeCall(() =>
+            {
+                foreach (var boss in bosses.ToList())
+                {
+                    var hero = boss?.Hero;
+                    if (hero == null || hero.IsDead) continue;
+
+                    try { hero.ChangeState(Hero.CharacterStates.Disabled); }
+                    catch (Exception ex) { Log.Trace($"[Boss] Could not retire {hero.Name}: {ex.Message}"); }
+                }
+            });
+
             SafeCall(bosses.Clear);
         }
     }
