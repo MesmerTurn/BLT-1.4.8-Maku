@@ -208,6 +208,7 @@ namespace BLTAdoptAHero
                     campaignStarter.AddBehavior(new BLTClanBehavior());
             campaignStarter.AddBehavior(new BLTBossSiegeMemory());
             campaignStarter.AddBehavior(new BLTCompanionGrowthBehavior());
+                campaignStarter.AddBehavior(new BLTStrayHeroCleanupBehavior());
             campaignStarter.AddBehavior(new BLTBannerSanitizerBehavior());
                     campaignStarter.AddBehavior(new GoldIncomeBehavior()); 
                     campaignStarter.AddBehavior(new BLTSettlementUpgradeBehavior());

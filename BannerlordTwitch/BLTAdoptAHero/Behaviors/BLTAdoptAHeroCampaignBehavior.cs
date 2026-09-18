@@ -128,7 +128,36 @@ namespace BLTAdoptAHero
         /// <summary>
         /// Records that troop ascension has created another lord. Call only after the clan exists.
         /// </summary>
-        public void RecordAscendedLord() => ascendedLordCount++;       
+        public void RecordAscendedLord() => ascendedLordCount++;
+
+        // Every hero made a lord by ascension or !promote, by StringId. Needed to keep them out of
+        // marriage for good - their clans are made on the fly and marrying into them is what
+        // produced the wall of red errors Maku kept seeing.
+        private List<string> ascendedHeroIds = new();
+
+        public void MarkAscended(Hero hero)
+        {
+            if (hero?.StringId != null && !ascendedHeroIds.Contains(hero.StringId))
+                ascendedHeroIds.Add(hero.StringId);
+        }
+
+        /// <summary>
+        /// Whether this hero is, or belongs to the clan of, a lord made by ascension or !promote.
+        /// Saves from before the list existed are caught by the clan name those clans are given.
+        /// </summary>
+        public bool IsAscended(Hero hero)
+        {
+            if (hero == null) return false;
+            if (hero.StringId != null && ascendedHeroIds.Contains(hero.StringId)) return true;
+
+            var leader = hero.Clan?.Leader;
+            if (leader == null || leader.IsAdopted()) return false;
+            if (leader != hero && leader.StringId != null && ascendedHeroIds.Contains(leader.StringId)) return true;
+
+            string expected = "{=}Clan of {NAME}".Translate(("NAME", leader.Name?.ToString() ?? ""));
+            return hero.Clan.Name?.ToString() == expected;
+        }
+
         private Dictionary<Hero, HashSet<Guid>> heroAchievementPassivePowers = new();
         #endregion
 
@@ -359,6 +388,8 @@ namespace BLTAdoptAHero
             // there is no record of earlier promotions to count, and inventing one would be worse
             // than starting the allowance fresh.
             dataStore.SyncData("BLTAscendedLordCount", ref ascendedLordCount);
+            dataStore.SyncData("BLTAscendedHeroIds", ref ascendedHeroIds);
+            ascendedHeroIds ??= new();
 
             if (dataStore.IsLoading)
             {

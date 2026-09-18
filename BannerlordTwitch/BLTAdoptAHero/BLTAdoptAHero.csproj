@@ -416,6 +416,8 @@
     <Compile Include="Behaviors\MarriageOfferCrashGuard.cs" />
     <Compile Include="Behaviors\SiegeDeploymentDiagnostic.cs" />
     <Compile Include="Actions\GuardCommand.cs" />
+    <Compile Include="Actions\UnguardCommand.cs" />
+    <Compile Include="Behaviors\BLTStrayHeroCleanupBehavior.cs" />
     <Compile Include="Actions\FollowCommand.cs" />
     <Compile Include="Behaviors\BLTGuardBehavior.cs" />
     <Compile Include="Behaviors\BLTFollowBehavior.cs" />

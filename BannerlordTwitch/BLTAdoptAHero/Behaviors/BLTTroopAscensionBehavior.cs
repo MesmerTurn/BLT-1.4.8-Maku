@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using HarmonyLib;
 using BannerlordTwitch.Util;
 using BLTAdoptAHero.Behaviors;
 using TaleWorlds.CampaignSystem;
@@ -139,6 +142,7 @@ namespace BLTAdoptAHero
             try { hero.UpdateHomeSettlement(); }
             catch (Exception ex) { Log.Error($"[TroopAscension] Could not set home settlement: {ex.Message}"); }
             clan.IsNoble = true;
+            BLTAdoptAHeroCampaignBehavior.Current?.MarkAscended(hero);
             CampaignEventDispatcher.Instance.OnClanCreated(clan, false);
 
             // Promoted through a viewer, the new lord serves whoever that viewer serves. Done
@@ -162,6 +166,76 @@ namespace BLTAdoptAHero
             }
 
             if (startingGold > 0) hero.ChangeHeroGold(startingGold);
+
+            // Put the new lord somewhere real. Left with no party and no location, the battle's
+            // aftermath filed them into the party the troop fought for - which, when a streamer's
+            // own soldier killed an adopted hero, was the streamer's party. Maku kept finding them
+            // there as nameless "troops" after every fight.
+            PlaceInHome(hero);
+        }
+
+        /// <summary>
+        /// Takes an ascended lord out of any party that is not their own and puts them in their
+        /// clan's home settlement, where the campaign will raise them a party of their own.
+        /// </summary>
+        public static void PlaceInHome(Hero hero)
+        {
+            try
+            {
+                var party = hero.PartyBelongedTo;
+                if (party != null && party.LeaderHero != hero)
+                    party.MemberRoster.RemoveTroop(hero.CharacterObject);
+
+                var home = hero.Clan?.HomeSettlement
+                           ?? Settlement.All.Where(s => s.IsTown).SelectRandom();
+                if (home != null && hero.PartyBelongedTo == null && hero.CurrentSettlement == null)
+                    EnterSettlementAction.ApplyForCharacterOnly(hero, home);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"[TroopAscension] Could not place {hero?.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Requested by Maku: ascended lords keep their own clans but never marry. Marriages into
+        /// these made-on-the-fly clans are what kept filling the screen with red errors.
+        /// </summary>
+        [HarmonyPatch]
+        public static class NoMarriagePatch
+        {
+            private const string ModelType =
+                "TaleWorlds.CampaignSystem.GameComponents.DefaultMarriageModel";
+
+            static bool Prepare() => AccessTools.TypeByName(ModelType) != null;
+
+            static IEnumerable<MethodBase> TargetMethods()
+            {
+                var type = AccessTools.TypeByName(ModelType);
+                if (type == null) yield break;
+                foreach (var m in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                {
+                    if (m.ReturnType != typeof(bool)) continue;
+                    if (m.Name != "IsSuitableForMarriage" && m.Name != "IsCoupleSuitableForMarriage") continue;
+                    if (m.GetParameters().Length == 0 || m.GetParameters().Any(p => p.ParameterType != typeof(Hero))) continue;
+                    yield return m;
+                }
+            }
+
+            static void Postfix(object[] __args, ref bool __result)
+            {
+                if (!__result) return;
+                try
+                {
+                    var campaign = BLTAdoptAHeroCampaignBehavior.Current;
+                    if (campaign == null) return;
+                    if (__args.OfType<Hero>().Any(campaign.IsAscended)) __result = false;
+                }
+                catch (Exception ex)
+                {
+                    Log.Exception($"{nameof(NoMarriagePatch)}", ex);
+                }
+            }
         }
 
         private static void SafeCall(Action action)
