@@ -49,6 +49,16 @@ namespace BLTAdoptAHero
 
                     foreach (var hero in strays)
                     {
+                        if (IsForeignCompanion(hero, party))
+                        {
+                            // A viewer's companion left behind after a battle: back to their clan.
+                            var leaderParty = hero.CompanionOf.Leader?.PartyBelongedTo;
+                            BLTSummonBehavior.ReturnCompanion(hero, party.Party,
+                                leaderParty != party ? leaderParty : null, null);
+                            Log.Trace($"[StrayHero] Returned companion {hero.Name} from {party.Name}");
+                            continue;
+                        }
+
                         if (IsForeignAscendedLord(hero, party))
                         {
                             // A real lord of their own clan: send them home, do not retire them.
@@ -74,6 +84,7 @@ namespace BLTAdoptAHero
             if (hero == null || hero == Hero.MainHero) return false;
             if (hero == party.LeaderHero) return false;
             if (IsForeignAscendedLord(hero, party)) return true;
+            if (IsForeignCompanion(hero, party)) return true;
             if (hero.Clan != null || hero.CompanionOf != null) return false;
             if (hero.IsAdopted()) return false;
             // No clan and nobody's companion: a hero in a party roster like that belongs to no
@@ -86,6 +97,19 @@ namespace BLTAdoptAHero
         /// A lord made from a troop (ascension or !promote) sitting as a member in a party that
         /// belongs to a different clan - the soldier's old unit, usually the player's.
         /// </summary>
+        /// <summary>
+        /// A companion of a viewer's clan sitting in a party of some other clan. This is what
+        /// Maku actually saw: summoning brought a viewer's companions in through his party and
+        /// never took them back out.
+        /// </summary>
+        private static bool IsForeignCompanion(Hero hero, MobileParty party)
+        {
+            var clan = hero?.CompanionOf;
+            if (clan == null || clan == Clan.PlayerClan) return false;
+            if (party.ActualClan == clan) return false;
+            return clan.Leader != null && clan.Leader.IsAdopted();
+        }
+
         private static bool IsForeignAscendedLord(Hero hero, MobileParty party)
         {
             if (hero?.Clan == null || hero.Clan.Leader != hero) return false;

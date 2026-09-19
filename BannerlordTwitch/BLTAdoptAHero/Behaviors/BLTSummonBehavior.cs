@@ -5,6 +5,8 @@ using System.Reflection;
 using BannerlordTwitch.Helpers;
 using BannerlordTwitch.Util;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.CampaignSystem.Party;
@@ -40,6 +42,9 @@ namespace BLTAdoptAHero
             public int TimesSummoned = 0;
             public List<RetinueState> Retinue { get; set; } = new();
             public List<RetinueState> Retinue2 { get; set; } = new();
+            // Companions brought in with this hero, with where they were before, so they can be put
+            // back after the battle instead of staying in the party they were spawned from.
+            public List<(Hero Hero, MobileParty From, Settlement At)> Companions { get; set; } = new();
 
             public int ActiveRetinue => Retinue.Count(r => r.State == AgentState.Active);
             public int DeadRetinue => Retinue.Count(r => r.Died);
@@ -268,8 +273,49 @@ namespace BLTAdoptAHero
                     {
                         h.Party?.MemberRoster?.AddToCounts(r.Troop, -1);
                     }
+
+                    // Companions too. Only retinue used to be taken back out, so every companion
+                    // summoned stayed in the party they were spawned from - usually the streamer's -
+                    // as a named hero that could be dismissed like a troop but used for nothing.
+                    foreach (var c in h.Companions)
+                    {
+                        try { ReturnCompanion(c.Hero, h.Party, c.From, c.At); }
+                        catch (Exception ex) { Log.Exception($"{nameof(BLTSummonBehavior)}.{nameof(ReturnCompanion)}", ex); }
+                    }
                 }
             });
+        }
+
+        /// <summary>
+        /// Takes a summoned companion back out of the party they were spawned from and returns
+        /// them to where they were: their own party, or the settlement they were waiting in.
+        /// </summary>
+        public static void ReturnCompanion(Hero hero, PartyBase spawnedFrom, MobileParty from, Settlement at)
+        {
+            if (hero == null || hero.IsDead) return;
+
+            var now = hero.PartyBelongedTo;
+            if (now != null && now == from) return;               // they came from this party
+            if (spawnedFrom?.MobileParty != null && spawnedFrom.MobileParty == from) return;
+
+            if (now != null && now.LeaderHero != hero)
+                now.MemberRoster.RemoveTroop(hero.CharacterObject);
+            else if (spawnedFrom?.MemberRoster != null && spawnedFrom.MemberRoster.Contains(hero.CharacterObject))
+                spawnedFrom.MemberRoster.RemoveTroop(hero.CharacterObject);
+
+            if (from != null && from.IsActive)
+            {
+                if (!from.MemberRoster.Contains(hero.CharacterObject))
+                    AddHeroToPartyAction.Apply(hero, from);
+                return;
+            }
+
+            var home = at
+                       ?? hero.CompanionOf?.Leader?.CurrentSettlement
+                       ?? hero.CompanionOf?.HomeSettlement
+                       ?? Settlement.All.FirstOrDefault(s => s.IsTown);
+            if (home != null && hero.CurrentSettlement == null)
+                EnterSettlementAction.ApplyForCharacterOnly(hero, home);
         }
 
         /// <summary>
@@ -320,6 +366,7 @@ namespace BLTAdoptAHero
                     if (onPlayerSide && cfg.RetinueUseHeroesFormation)
                         Campaign.Current.SetPlayerFormationPreference(troop, ownerFormationClass);
 
+                    existingHero.Companions.Add((companion, companion.PartyBelongedTo, companion.CurrentSettlement));
                     existingHero.Party.MemberRoster.AddToCounts(troop, 1);
 
                     var agent = SpawnAgent(onPlayerSide, troop, existingHero.Party,
