@@ -79,14 +79,27 @@ namespace BLTAdoptAHero
          PropertyOrder(8), UsedImplicitly]
         public bool UseCamel { get; set; }
 
+        // Requested by Maku for Eagle Rising, which adds war elephants and chariots as mounts.
+        // Both are recognised by the id of the creature they use rather than its family number,
+        // because mods number their custom creatures freely.
+        [LocDisplayName("{=}Use Elephant"),
+         LocDescription("{=}Whether to allow war elephants (mods such as Eagle Rising). Can be combined with the other mount options."),
+         PropertyOrder(9), UsedImplicitly]
+        public bool UseElephant { get; set; }
+
+        [LocDisplayName("{=}Use Chariot"),
+         LocDescription("{=}Whether to allow chariots (mods such as Eagle Rising). Can be combined with the other mount options."),
+         PropertyOrder(10), UsedImplicitly]
+        public bool UseChariot { get; set; }
+
         [LocDisplayName("{=MvddFKo4}Passive Power"),
          LocDescription("{=F8a2nXYo}Passive hero power: this will always apply to the hero (i.e. a permanent buff)"),
-         PropertyOrder(9), ExpandableObject, Expand, UsedImplicitly]
+         PropertyOrder(11), ExpandableObject, Expand, UsedImplicitly]
         public PassivePowerGroup PassivePower { get; set; } = new() { Name = "{=MvddFKo4}Passive Power" };
 
         [LocDisplayName("{=wdCMNOGd}Active Power"),
          LocDescription("{=I4ASwveG}Active hero power: this power will be triggered only when the UseHeroPower action is used by the viewer, via reward or command (i.e. a temporary buff)"),
-         PropertyOrder(10), ExpandableObject, Expand, UsedImplicitly]
+         PropertyOrder(12), ExpandableObject, Expand, UsedImplicitly]
         public ActivePowerGroup ActivePower { get; set; } = new() { Name = "{=wdCMNOGd}Active Power" };
         #endregion
 
@@ -118,9 +131,30 @@ namespace BLTAdoptAHero
         // For UI
         [YamlIgnore, Browsable(false)]
         public string MountDescription
-            => (UseHorse ? "{=YzIcRgBV}Horse".Translate() : "") +
-               (UseHorse && UseCamel ? "/" : "") +
-               (UseCamel ? "{=HMclWXR8}Camel".Translate() : "");
+            => string.Join("/", new[]
+            {
+                UseHorse ? "{=YzIcRgBV}Horse".Translate() : null,
+                UseCamel ? "{=HMclWXR8}Camel".Translate() : null,
+                UseElephant ? "{=}Elephant".Translate() : null,
+                UseChariot ? "{=}Chariot".Translate() : null,
+            }.Where(s => s != null));
+
+        /// <summary>
+        /// Whether this class may ride the given mount. Elephants and chariots are told apart by
+        /// the id of their creature; everything else by the game's own horse/camel family.
+        /// </summary>
+        public bool AllowsMount(ItemObject item)
+        {
+            var monster = item?.HorseComponent?.Monster;
+            if (monster == null) return false;
+
+            string id = monster.StringId?.ToLowerInvariant() ?? "";
+            if (id.Contains("chariot")) return UseChariot;
+            if (id.Contains("elephant") || id.Contains("mumak")) return UseElephant;
+
+            return UseHorse && monster.FamilyType == (int)EquipHero.MountFamilyType.horse
+                   || UseCamel && monster.FamilyType == (int)EquipHero.MountFamilyType.camel;
+        }
 
         [YamlIgnore, Browsable(false)]
         public IEnumerable<EquipmentType> Weapons
@@ -131,7 +165,7 @@ namespace BLTAdoptAHero
             => IndexedSlots.Where(s => s.type is not (EquipmentType.None or EquipmentType.Shield));
 
         [YamlIgnore, Browsable(false)]
-        public bool Mounted => UseHorse || UseCamel;
+        public bool Mounted => UseHorse || UseCamel || UseElephant || UseChariot;
 
         [YamlIgnore, Browsable(false)]
         public IEnumerable<SkillObject> WeaponSkills =>
@@ -163,7 +197,9 @@ namespace BLTAdoptAHero
         public override string ToString() =>
             $"{Name} : {string.Join(", ", SlotItems.Select(s => s.ToString()))}"
             + (UseHorse ? " (" + "{=A1G6bq0G}Use Horse".Translate() + ")" : "")
-            + (UseCamel ? " (" + "{=FpgyZk0F}Use Camel".Translate() + ")" : "");
+            + (UseCamel ? " (" + "{=FpgyZk0F}Use Camel".Translate() + ")" : "")
+            + (UseElephant ? " (" + "{=}Use Elephant".Translate() + ")" : "")
+            + (UseChariot ? " (" + "{=}Use Chariot".Translate() + ")" : "");
 
         #endregion
 

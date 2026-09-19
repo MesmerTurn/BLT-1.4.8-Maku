@@ -568,10 +568,7 @@ namespace BLTAdoptAHero
             {
                 // Must match hero class requirements
                 return (heroClass == null
-                        || heroClass.UseHorse && item.HorseComponent.Monster.FamilyType
-                            is (int)EquipHero.MountFamilyType.horse
-                        || heroClass.UseCamel && item.HorseComponent.Monster.FamilyType
-                            is (int)EquipHero.MountFamilyType.camel)
+                        || heroClass.AllowsMount(item))
                        // Must also not differ from current mount family type (or saddle can get messed up)
                        && (currentMount.IsEmpty
                            || currentMount.Item.HorseComponent.Monster.FamilyType
@@ -829,10 +826,7 @@ namespace BLTAdoptAHero
             {
                 // Must match hero class requirements
                 return (heroClass == null
-                        || heroClass.UseHorse && item.HorseComponent.Monster.FamilyType
-                            is (int)EquipHero.MountFamilyType.horse
-                        || heroClass.UseCamel && item.HorseComponent.Monster.FamilyType
-                            is (int)EquipHero.MountFamilyType.camel)
+                        || heroClass.AllowsMount(item))
                        // Must also not differ from current mount family type (or saddle can get messed up)
                        && (currentMount.IsEmpty
                            || currentMount.Item.HorseComponent.Monster.FamilyType

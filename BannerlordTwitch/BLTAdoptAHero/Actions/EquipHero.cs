@@ -422,8 +422,7 @@ namespace BLTAdoptAHero
                     h =>
                         h.HorseComponent?.IsMount == true
                         && (classDef == null
-                            || classDef.UseHorse && h.HorseComponent.Monster.FamilyType == (int)MountFamilyType.horse
-                            || classDef.UseCamel && h.HorseComponent.Monster.FamilyType == (int)MountFamilyType.camel
+                            || classDef.AllowsMount(h)
                         ),
                     // allow non-merchandise mounts, to include the tournament prize ones, and ignore ability to allow camel riders to ride something
                     FindFlags.IgnoreAbility | FindFlags.AllowNonMerchandise
