@@ -58,7 +58,8 @@ namespace BLTAdoptAHero
         /// weapon, so a shield wall does not quietly get a stat it cannot use.
         /// </summary>
         public void Rally(Agent agent, float durationSeconds, float damageDealtPercent,
-            float damageTakenPercent, float lifestealPercent, float rangedFireRatePercent)
+            float damageTakenPercent, float lifestealPercent, float rangedFireRatePercent,
+            float swingSpeedPercent = 100f)
         {
             if (agent == null || !agent.IsActive()) return;
 
@@ -76,14 +77,25 @@ namespace BLTAdoptAHero
 
             if (rangedFireRatePercent != 100f && IsRanged(agent))
             {
-                state.Modifier = new AgentModifierConfig();
+                state.Modifier ??= new AgentModifierConfig();
                 state.Modifier.Properties.Add(new PropertyModifierDef
                 {
                     Name = DrivenProperty.ReloadSpeed,
                     ModifierPercent = rangedFireRatePercent,
                 });
-                BLTAgentModifierBehavior.Current?.Add(agent, state.Modifier);
             }
+
+            if (swingSpeedPercent != 100f)
+            {
+                state.Modifier ??= new AgentModifierConfig();
+                state.Modifier.Properties.Add(new PropertyModifierDef
+                {
+                    Name = DrivenProperty.SwingSpeedMultiplier,
+                    ModifierPercent = swingSpeedPercent,
+                });
+            }
+
+            if (state.Modifier != null) BLTAgentModifierBehavior.Current?.Add(agent, state.Modifier);
 
             rallied[agent] = state;
         }
