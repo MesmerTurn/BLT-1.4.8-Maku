@@ -419,6 +419,7 @@
     <Compile Include="Actions\RallyCommand.cs" />
     <Compile Include="Actions\WarHornCommand.cs" />
     <Compile Include="Actions\MarkCommand.cs" />
+    <Compile Include="Actions\BattleEventCommands.cs" />
     <Compile Include="Behaviors\BLTBattleEventsBehavior.cs" />
     <Compile Include="Behaviors\BLTRallyBehavior.cs" />
     <Compile Include="Actions\UnguardCommand.cs" />

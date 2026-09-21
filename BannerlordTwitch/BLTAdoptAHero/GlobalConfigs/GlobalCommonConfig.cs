@@ -560,6 +560,110 @@ namespace BLTAdoptAHero
          LocDescription("{=}Kills the winner needs before anything is paid, so one lucky kill in a quiet skirmish does not win it."),
          PropertyOrder(13), UsedImplicitly]
         public int BloodMoneyMinimumKills { get; set; } = 3;
+
+        [LocDisplayName("{=}Last Stand"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}When an adopted hero's side has been cut down to a fraction of the enemy's numbers, that hero gets one last burst: healed, hitting harder, and the enemies around them slowed. Once per hero per battle."),
+         PropertyOrder(14), UsedImplicitly]
+        public bool LastStandEnabled { get; set; } = false;
+
+        [LocDisplayName("{=}Last Stand: Trigger At Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Their side's numbers as a percent of the enemy's, below which it fires. 25 means outnumbered four to one."),
+         Range(5, 90), PropertyOrder(15), UsedImplicitly]
+        public float LastStandRemainingPercent { get; set; } = 25f;
+
+        [LocDisplayName("{=}Last Stand: Duration (seconds)"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(16), UsedImplicitly]
+        public float LastStandDurationSeconds { get; set; } = 30f;
+
+        [LocDisplayName("{=}Last Stand: Heal Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(17), UsedImplicitly]
+        public float LastStandHealPercent { get; set; } = 100f;
+
+        [LocDisplayName("{=}Last Stand: Damage Dealt Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(18), UsedImplicitly]
+        public float LastStandDamageDealtPercent { get; set; } = 150f;
+
+        [LocDisplayName("{=}Last Stand: Damage Taken Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(19), UsedImplicitly]
+        public float LastStandDamageTakenPercent { get; set; } = 80f;
+
+        [LocDisplayName("{=}Last Stand: Enemy Slow Radius"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(20), UsedImplicitly]
+        public float LastStandSlowRadius { get; set; } = 8f;
+
+        [LocDisplayName("{=}Last Stand: Enemy Speed Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Movement speed of enemies caught in it. 70 means they move at seven tenths of normal."),
+         PropertyOrder(21), UsedImplicitly]
+        public float LastStandEnemySpeedPercent { get; set; } = 70f;
+
+        [LocDisplayName("{=}Last Stand: Effect"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(22), ExpandableObject, Expand, UsedImplicitly]
+        public OneShotEffect LastStandEffect { get; set; }
+
+        [LocDisplayName("{=}Burning Arrows: Burn Seconds"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}How long someone hit by a lit arrow burns for."),
+         PropertyOrder(23), UsedImplicitly]
+        public float BurningArrowsBurnSeconds { get; set; } = 5f;
+
+        [LocDisplayName("{=}Burning Arrows: Damage Per Second"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Damage the fire does each second. It can never be the killing blow by itself - a burning man is always left with 1 health."),
+         PropertyOrder(24), UsedImplicitly]
+        public float BurningArrowsDamagePerSecond { get; set; } = 6f;
+
+        [LocDisplayName("{=}Burning Arrows: Burn Effect"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Effect played on a burning man each second - pick a fire effect here."),
+         PropertyOrder(25), ExpandableObject, Expand, UsedImplicitly]
+        public OneShotEffect BurningArrowsBurnEffect { get; set; }
+
+        [LocDisplayName("{=}Banner: Radius"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}How far the banner's encouragement reaches."),
+         PropertyOrder(26), UsedImplicitly]
+        public float BannerRadius { get; set; } = 15f;
+
+        [LocDisplayName("{=}Banner: Damage Dealt Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(27), UsedImplicitly]
+        public float BannerDamageDealtPercent { get; set; } = 110f;
+
+        [LocDisplayName("{=}Banner: Damage Taken Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(28), UsedImplicitly]
+        public float BannerDamageTakenPercent { get; set; } = 95f;
+
+        [LocDisplayName("{=}Banner: Morale Lost When It Falls"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Morale lost by everyone near the bearer when they go down."),
+         PropertyOrder(29), UsedImplicitly]
+        public float BannerFallMoraleLoss { get; set; } = 15f;
+
+        [LocDisplayName("{=}Banner: Effect"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(30), ExpandableObject, Expand, UsedImplicitly]
+        public OneShotEffect BannerEffect { get; set; }
+
+        [LocDisplayName("{=}Duel: Morale Swing"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Morale the winning champion's side gains, and the loser's side loses, when a duel of champions is settled."),
+         PropertyOrder(31), UsedImplicitly]
+        public float DuelMoraleSwing { get; set; } = 20f;
+
+        [LocDisplayName("{=}Duel: Effect"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(32), ExpandableObject, Expand, UsedImplicitly]
+        public OneShotEffect DuelEffect { get; set; }
         #endregion
 
         [LocDisplayName("{=}BLT children aging multiplier"),

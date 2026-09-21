@@ -64,6 +64,11 @@ namespace BLTAdoptAHero
                 if (markedAgent != null && affectedAgent == markedAgent)
                     PayBounty(affectorAgent);
 
+                if (HasDuel && (affectedAgent == championAlly || affectedAgent == championEnemy))
+                    ResolveDuel(affectedAgent);
+
+                if (affectedAgent == bannerAgent) DropBanner(BLTAdoptAHeroModule.CommonConfig);
+
                 var killerHero = affectorAgent?.GetAdoptedHero();
                 if (killerHero == null || killerHero == victimHero) return;
 
@@ -237,7 +242,11 @@ namespace BLTAdoptAHero
 
         public override void OnMissionTick(float dt)
         {
-            if (Mission.Current == null || markedAgent == null) return;
+            if (Mission.Current == null) return;
+
+            SlowTick(dt);
+
+            if (markedAgent == null) return;
 
             float now = Mission.Current.CurrentTime;
             if (!markedAgent.IsActive() || now > markExpiresAt)
@@ -252,6 +261,348 @@ namespace BLTAdoptAHero
             if (now - lastMarkPfx < 2f) return;
             lastMarkPfx = now;
             BLTAdoptAHeroModule.CommonConfig?.BountyMarkEffect.Trigger(markedAgent);
+        }
+
+        #endregion
+
+        #region Slow tick
+
+        private float slowTickAccumulated;
+        private const float SlowTickInterval = 1f;
+
+        /// <summary>
+        /// The things that have to be watched rather than triggered: a side being ground down, a
+        /// banner still standing, and men who are on fire.
+        /// </summary>
+        private void SlowTick(float dt)
+        {
+            slowTickAccumulated += dt;
+            if (slowTickAccumulated < SlowTickInterval) return;
+            float elapsed = slowTickAccumulated;
+            slowTickAccumulated = 0f;
+
+            try
+            {
+                TickBurning(elapsed);
+                TickBanner();
+                TickLastStand();
+            }
+            catch (Exception ex)
+            {
+                Log.Exception($"{nameof(BLTBattleEventsBehavior)}.{nameof(SlowTick)}", ex);
+            }
+        }
+
+        #endregion
+
+        #region Last stand
+
+        // Heroes who have already had their last stand this battle. Once each: it is a last stand,
+        // not a second wind on tap.
+        private readonly HashSet<Hero> lastStandUsed = new();
+
+        private void TickLastStand()
+        {
+            var cfg = BLTAdoptAHeroModule.CommonConfig;
+            if (cfg?.LastStandEnabled != true || Mission.Current?.Agents == null) return;
+
+            var rally = BLTRallyBehavior.Current;
+            if (rally == null) return;
+
+            foreach (var agent in Mission.Current.Agents.ToList())
+            {
+                if (agent == null || !agent.IsActive() || !agent.IsHuman) continue;
+
+                var hero = agent.GetAdoptedHero();
+                if (hero == null || lastStandUsed.Contains(hero)) continue;
+                if (!IsSideNearlyLost(agent, cfg.LastStandRemainingPercent)) continue;
+
+                lastStandUsed.Add(hero);
+
+                agent.Health = Math.Min(agent.HealthLimit,
+                    agent.Health + agent.HealthLimit * cfg.LastStandHealPercent / 100f);
+
+                rally.Rally(agent, cfg.LastStandDurationSeconds, cfg.LastStandDamageDealtPercent,
+                    cfg.LastStandDamageTakenPercent, 0f, 100f);
+
+                SlowEnemiesAround(agent, cfg.LastStandSlowRadius, cfg.LastStandEnemySpeedPercent,
+                    cfg.LastStandDurationSeconds);
+
+                cfg.LastStandEffect.Trigger(agent);
+
+                Log.LogFeedEvent("{=}{Name} makes a last stand!"
+                    .Translate(("Name", hero.FirstName.ToString())));
+            }
+        }
+
+        /// <summary>
+        /// Whether this agent's side has been cut down to a small fraction of the enemy's numbers.
+        /// Counted live rather than from the starting rosters, so reinforcements arriving pull a
+        /// side back out of it.
+        /// </summary>
+        private static bool IsSideNearlyLost(Agent agent, float remainingPercent)
+        {
+            if (agent.Team == null) return false;
+
+            int friends = 0, enemies = 0;
+            foreach (var other in Mission.Current.Agents)
+            {
+                if (other == null || !other.IsActive() || !other.IsHuman || other.Team == null) continue;
+                if (other.Team.IsFriendOf(agent.Team)) friends++;
+                else if (other.IsEnemyOf(agent)) enemies++;
+            }
+
+            if (enemies < 5) return false;
+            return friends * 100f / enemies <= remainingPercent;
+        }
+
+        private void SlowEnemiesAround(Agent centre, float radius, float speedPercent, float duration)
+        {
+            if (speedPercent >= 100f) return;
+
+            float radiusSq = radius * radius;
+            var rally = BLTRallyBehavior.Current;
+
+            foreach (var other in Mission.Current.Agents.ToList())
+            {
+                if (other == null || !other.IsActive() || !other.IsEnemyOf(centre)) continue;
+                if ((other.Position - centre.Position).LengthSquared > radiusSq) continue;
+
+                // Reuse the rally timer to carry the slow: it already applies a modifier for a
+                // fixed time and takes it off again cleanly when the time runs out.
+                rally?.Rally(other, duration, 100f, 100f, 0f, 100f, 100f, speedPercent);
+            }
+        }
+
+        #endregion
+
+        #region Burning arrows
+
+        private class Burning
+        {
+            public float ExpiresAt;
+            public float DamagePerSecond;
+            public Hero Owner;
+        }
+
+        // Archers whose arrows set men alight, and the men currently alight.
+        private readonly Dictionary<Agent, float> burningArchersUntil = new();
+        private readonly Dictionary<Agent, Burning> burningAgents = new();
+
+        public int LightArrows(Hero hero, float durationSeconds, OneShotEffect effect)
+        {
+            int count = 0;
+            float until = Mission.Current.CurrentTime + durationSeconds;
+
+            foreach (var agent in BLTRallyBehavior.RallyGroup(hero).ToList())
+            {
+                if (agent == null || !agent.IsActive()) continue;
+                burningArchersUntil[agent] = until;
+                effect.Trigger(agent);
+                count++;
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Called for every blow. A burning archer's hit sets the victim alight for a few seconds
+        /// instead of setting the ground on fire - fire that sticks to men is something the engine
+        /// will do, a burning patch of field is not.
+        /// </summary>
+        public void OnBlowLanded(Agent attacker, Agent victim, bool ranged)
+        {
+            try
+            {
+                var cfg = BLTAdoptAHeroModule.CommonConfig;
+                if (cfg == null || !ranged || attacker == null || victim == null) return;
+                if (!burningArchersUntil.TryGetValue(attacker, out float until)) return;
+                if (Mission.Current.CurrentTime > until) { burningArchersUntil.Remove(attacker); return; }
+
+                burningAgents[victim] = new Burning
+                {
+                    ExpiresAt = Mission.Current.CurrentTime + cfg.BurningArrowsBurnSeconds,
+                    DamagePerSecond = cfg.BurningArrowsDamagePerSecond,
+                    Owner = attacker.GetAdoptedHero(),
+                };
+            }
+            catch (Exception ex)
+            {
+                Log.Exception($"{nameof(BLTBattleEventsBehavior)}.{nameof(OnBlowLanded)}", ex);
+            }
+        }
+
+        private void TickBurning(float elapsed)
+        {
+            if (burningAgents.Count == 0) return;
+
+            float now = Mission.Current.CurrentTime;
+            var effect = BLTAdoptAHeroModule.CommonConfig?.BurningArrowsBurnEffect ?? default;
+
+            foreach (var pair in burningAgents.ToList())
+            {
+                var agent = pair.Key;
+                if (agent == null || !agent.IsActive() || now > pair.Value.ExpiresAt)
+                {
+                    burningAgents.Remove(agent);
+                    continue;
+                }
+
+                float damage = pair.Value.DamagePerSecond * elapsed;
+                agent.Health = Math.Max(1f, agent.Health - damage);
+                effect.Trigger(agent);
+            }
+        }
+
+        #endregion
+
+        #region Banner bearer
+
+        private Agent bannerAgent;
+        private Hero bannerHero;
+        private float lastBannerPfx;
+
+        public bool HasBanner => bannerAgent != null && bannerAgent.IsActive();
+        public string BannerHolderName => bannerHero?.FirstName?.ToString() ?? "";
+
+        public (bool taken, string message) TakeBanner(Hero hero, Agent agent)
+        {
+            if (HasBanner && bannerAgent != agent)
+                return (false, "{=}{Name} is already carrying the banner"
+                    .Translate(("Name", BannerHolderName)));
+
+            bannerAgent = agent;
+            bannerHero = hero;
+            BLTAdoptAHeroModule.CommonConfig?.BannerEffect.Trigger(agent);
+
+            return (true, "{=}{Name} raises the banner!".Translate(("Name", hero.FirstName.ToString())));
+        }
+
+        /// <summary>
+        /// While the banner stands, everyone near it fights harder. When the bearer goes down, the
+        /// men around them lose heart - which is the whole point of carrying it.
+        /// </summary>
+        private void TickBanner()
+        {
+            var cfg = BLTAdoptAHeroModule.CommonConfig;
+            if (cfg == null || bannerAgent == null) return;
+
+            if (!bannerAgent.IsActive())
+            {
+                DropBanner(cfg);
+                return;
+            }
+
+            float radiusSq = cfg.BannerRadius * cfg.BannerRadius;
+            var rally = BLTRallyBehavior.Current;
+
+            foreach (var agent in Mission.Current.Agents.ToList())
+            {
+                if (agent == null || !agent.IsActive() || !agent.IsHuman) continue;
+                if (agent.Team == null || !agent.Team.IsFriendOf(bannerAgent.Team)) continue;
+                if ((agent.Position - bannerAgent.Position).LengthSquared > radiusSq) continue;
+
+                // Refreshed every second, so stepping out of its shadow ends the bonus shortly
+                // afterwards rather than carrying it across the field.
+                rally?.Rally(agent, 2f, cfg.BannerDamageDealtPercent, cfg.BannerDamageTakenPercent,
+                    0f, 100f);
+            }
+
+            float now = Mission.Current.CurrentTime;
+            if (now - lastBannerPfx >= 3f)
+            {
+                lastBannerPfx = now;
+                cfg.BannerEffect.Trigger(bannerAgent);
+            }
+        }
+
+        private void DropBanner(GlobalCommonConfig cfg)
+        {
+            var fallen = bannerAgent;
+            string name = BannerHolderName;
+            bannerAgent = null;
+            bannerHero = null;
+
+            if (fallen == null || cfg.BannerFallMoraleLoss <= 0) return;
+
+            float radiusSq = cfg.BannerRadius * cfg.BannerRadius;
+            foreach (var agent in Mission.Current.Agents.ToList())
+            {
+                if (agent == null || !agent.IsActive() || agent.Team == null) continue;
+                if (!agent.Team.IsFriendOf(fallen.Team)) continue;
+                if ((agent.Position - fallen.Position).LengthSquared > radiusSq) continue;
+
+                try { agent.SetMorale(Math.Max(0f, agent.GetMorale() - cfg.BannerFallMoraleLoss)); }
+                catch { }
+            }
+
+            Log.LogFeedEvent("{=}The banner falls with {Name}!".Translate(("Name", name)));
+        }
+
+        #endregion
+
+        #region Champion duel
+
+        private Agent championAlly;
+        private Agent championEnemy;
+
+        public bool HasDuel => championAlly != null && championEnemy != null;
+
+        /// <summary>
+        /// A champion from each side, named before the lines meet. The armies are deliberately NOT
+        /// stopped: holding two AI armies still and handing them back afterwards is exactly how a
+        /// battle ends up unplayable. What is at stake is morale - whichever champion kills the
+        /// other lifts their own side and breaks the other's.
+        /// </summary>
+        public (bool started, string message) StartDuel(Hero hero, Agent challenger)
+        {
+            if (HasDuel)
+                return (false, "{=}A duel has already been called this battle".Translate());
+
+            var opponent = FindMarkTarget(challenger);
+            if (opponent == null)
+                return (false, "{=}There is no enemy champion to challenge".Translate());
+
+            championAlly = challenger;
+            championEnemy = opponent;
+
+            var cfg = BLTAdoptAHeroModule.CommonConfig;
+            cfg?.DuelEffect.Trigger(challenger);
+            cfg?.DuelEffect.Trigger(opponent);
+
+            return (true, "{=}{Name} challenges {Opponent}! Whoever falls, their side loses heart"
+                .Translate(("Name", hero.FirstName.ToString()), ("Opponent", opponent.Name)));
+        }
+
+        private void ResolveDuel(Agent fallen)
+        {
+            var cfg = BLTAdoptAHeroModule.CommonConfig;
+            if (cfg == null) return;
+
+            var loser = fallen;
+            var winner = fallen == championAlly ? championEnemy : championAlly;
+
+            championAlly = null;
+            championEnemy = null;
+
+            if (winner == null || loser?.Team == null) return;
+
+            foreach (var agent in Mission.Current.Agents.ToList())
+            {
+                if (agent == null || !agent.IsActive() || agent.Team == null) continue;
+
+                try
+                {
+                    if (winner.Team != null && agent.Team.IsFriendOf(winner.Team))
+                        agent.SetMorale(Math.Min(100f, agent.GetMorale() + cfg.DuelMoraleSwing));
+                    else if (agent.Team.IsFriendOf(loser.Team))
+                        agent.SetMorale(Math.Max(0f, agent.GetMorale() - cfg.DuelMoraleSwing));
+                }
+                catch { }
+            }
+
+            Log.LogFeedEvent("{=}{Winner} wins the duel of champions!"
+                .Translate(("Winner", winner.Name)));
         }
 
         #endregion
