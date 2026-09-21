@@ -59,7 +59,7 @@ namespace BLTAdoptAHero
         /// </summary>
         public void Rally(Agent agent, float durationSeconds, float damageDealtPercent,
             float damageTakenPercent, float lifestealPercent, float rangedFireRatePercent,
-            float swingSpeedPercent = 100f)
+            float swingSpeedPercent = 100f, float moveSpeedPercent = 100f)
         {
             if (agent == null || !agent.IsActive()) return;
 
@@ -92,6 +92,17 @@ namespace BLTAdoptAHero
                 {
                     Name = DrivenProperty.SwingSpeedMultiplier,
                     ModifierPercent = swingSpeedPercent,
+                });
+            }
+
+            // Also used to slow enemies (below 100%), not only to speed friends up.
+            if (moveSpeedPercent != 100f)
+            {
+                state.Modifier ??= new AgentModifierConfig();
+                state.Modifier.Properties.Add(new PropertyModifierDef
+                {
+                    Name = DrivenProperty.MaxSpeedMultiplier,
+                    ModifierPercent = moveSpeedPercent,
                 });
             }
 
@@ -169,9 +180,15 @@ namespace BLTAdoptAHero
         }
 
         [UsedImplicitly, HarmonyPrefix, HarmonyPatch(typeof(Mission), "RegisterBlow")]
-        private static void RallyRegisterBlowPrefix(Agent attacker, Agent victim, ref Blow b)
+        private static void RallyRegisterBlowPrefix(Agent attacker, Agent victim, ref Blow b,
+            in MissionWeapon attackerWeapon)
         {
             Current?.ApplyToBlow(attacker, victim, ref b);
+
+            // Burning arrows hang off the same blow: a ranged hit from a lit archer sets the
+            // victim alight.
+            bool ranged = attackerWeapon.CurrentUsageItem?.IsRangedWeapon == true;
+            BLTBattleEventsBehavior.Current?.OnBlowLanded(attacker, victim, ranged);
         }
 
         /// <summary>
