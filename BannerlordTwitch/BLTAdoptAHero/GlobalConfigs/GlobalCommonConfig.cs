@@ -480,6 +480,12 @@ namespace BLTAdoptAHero
          PropertyOrder(5), UsedImplicitly]
         public int CustomCompanionLimit { get; set; } = 7;
 
+        [LocDisplayName("{=}Companions Use Powers Too"),
+         LocCategory("General", "{=C5T6nnix}General"),
+         LocDescription("{=}When a viewer activates their class power, their companions in the battle activate the same power at the same time, for the same duration. No extra chat messages are sent for them."),
+         PropertyOrder(40), UsedImplicitly]
+        public bool CompanionsUsePowers { get; set; } = true;
+
         [LocDisplayName("{=}BLT children aging multiplier"),
          LocCategory("General", "{=C5T6nnix}General"),
          LocDescription("{=}Multiplier to BLT children age"),
