@@ -121,6 +121,33 @@ namespace BLTAdoptAHero.Powers
             return (true, "{=WDfytZ7z}{PowerName} activated!".Translate(("PowerName", Name)));
         }
 
+        /// <summary>
+        /// Activates this group on someone other than the viewer - their companions - without any
+        /// chat messages or effects of its own. Asked for by Maku: when a viewer uses their power,
+        /// the people fighting beside them should use theirs too. Silent on purpose: one viewer
+        /// pressing one button should not produce a line of chat per companion.
+        /// </summary>
+        public void ActivateSilently(Hero hero)
+        {
+            if (hero == null) return;
+
+            foreach (var power in GetUnlockedPowers(hero).ToList())
+            {
+                try
+                {
+                    if (power.IsActive(hero)) continue;
+                    var (canActivate, _) = power.CanActivate(hero);
+                    if (!canActivate) continue;
+
+                    power.Activate(hero, () => { });
+                }
+                catch (Exception ex)
+                {
+                    Log.Exception($"{nameof(ActivePowerGroup)}.{nameof(ActivateSilently)}", ex);
+                }
+            }
+        }
+
         public (float duration, float remaining) DurationRemaining(Hero hero)
         {
             if (!ValidPowers.Any())
