@@ -486,6 +486,82 @@ namespace BLTAdoptAHero
          PropertyOrder(40), UsedImplicitly]
         public bool CompanionsUsePowers { get; set; } = true;
 
+        #region Battle Events
+        [LocDisplayName("{=}Berserker Frenzy"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}A hero who kills several men in a row without going down goes into a frenzy: more damage, faster swings and lifesteal, but they take more damage in return. Being killed resets the count."),
+         PropertyOrder(1), UsedImplicitly]
+        public bool FrenzyEnabled { get; set; } = false;
+
+        [LocDisplayName("{=}Frenzy: Kills Required"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Kills in a row needed to enter a frenzy."),
+         Range(2, 20), PropertyOrder(2), UsedImplicitly]
+        public int FrenzyKillsRequired { get; set; } = 5;
+
+        [LocDisplayName("{=}Frenzy: Duration (seconds)"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(3), UsedImplicitly]
+        public float FrenzyDurationSeconds { get; set; } = 20f;
+
+        [LocDisplayName("{=}Frenzy: Damage Dealt Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Damage they deal while in a frenzy. 150 means half again as much."),
+         PropertyOrder(4), UsedImplicitly]
+        public float FrenzyDamageDealtPercent { get; set; } = 150f;
+
+        [LocDisplayName("{=}Frenzy: Damage Taken Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Damage they take while in a frenzy - the price of it. 125 means they take a quarter more."),
+         PropertyOrder(5), UsedImplicitly]
+        public float FrenzyDamageTakenPercent { get; set; } = 125f;
+
+        [LocDisplayName("{=}Frenzy: Lifesteal Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(6), UsedImplicitly]
+        public float FrenzyLifestealPercent { get; set; } = 25f;
+
+        [LocDisplayName("{=}Frenzy: Swing Speed Percent"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(7), UsedImplicitly]
+        public float FrenzySwingSpeedPercent { get; set; } = 130f;
+
+        [LocDisplayName("{=}Frenzy: Effect"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Particle effect and sound played when a hero goes into a frenzy."),
+         PropertyOrder(8), ExpandableObject, Expand, UsedImplicitly]
+        public OneShotEffect FrenzyEffect { get; set; }
+
+        [LocDisplayName("{=}Bounty Mark: Reward"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Gold paid to whichever adopted hero kills a marked enemy."),
+         PropertyOrder(9), UsedImplicitly]
+        public int BountyMarkReward { get; set; } = 5000;
+
+        [LocDisplayName("{=}Bounty Mark: Effect"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Particle effect and sound shown over a marked enemy, repeated every two seconds so it can be found on the field."),
+         PropertyOrder(10), ExpandableObject, Expand, UsedImplicitly]
+        public OneShotEffect BountyMarkEffect { get; set; }
+
+        [LocDisplayName("{=}Blood Money"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}At the end of a battle, the adopted hero with the most kills is paid for each of them and announced."),
+         PropertyOrder(11), UsedImplicitly]
+        public bool BloodMoneyEnabled { get; set; } = false;
+
+        [LocDisplayName("{=}Blood Money: Gold Per Kill"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         PropertyOrder(12), UsedImplicitly]
+        public int BloodMoneyGoldPerKill { get; set; } = 500;
+
+        [LocDisplayName("{=}Blood Money: Minimum Kills"),
+         LocCategory("BattleEvents", "{=}Battle Events"),
+         LocDescription("{=}Kills the winner needs before anything is paid, so one lucky kill in a quiet skirmish does not win it."),
+         PropertyOrder(13), UsedImplicitly]
+        public int BloodMoneyMinimumKills { get; set; } = 3;
+        #endregion
+
         [LocDisplayName("{=}BLT children aging multiplier"),
          LocCategory("General", "{=C5T6nnix}General"),
          LocDescription("{=}Multiplier to BLT children age"),
