@@ -69,14 +69,19 @@ namespace BLTAdoptAHero
          PropertyOrder(6), UsedImplicitly]
         public EquipmentType Slot4 { get; set; }
 
+        [LocDisplayName("{=}Weapon Name Filter"),
+         LocDescription("{=}Comma separated words. A weapon is only given to this class if its name or id contains one of them - so 'falx' on a Two Handed Sword slot gives Thracian falxes and nothing else, and 'sarissa' on a Two Handed Lance slot gives sarissas. Leave blank for no filter. If nothing in the game matches, the slot falls back to any weapon of its type rather than leaving the hero unarmed."),
+         PropertyOrder(7), UsedImplicitly]
+        public string WeaponNameFilter { get; set; } = "";
+
         [LocDisplayName("{=MdYmGuin}Use Horse"),
          LocDescription("{=Q00NX1J9}Whether to allow horse (can be combined with Use Camel)"),
-         PropertyOrder(7), UsedImplicitly]
+         PropertyOrder(8), UsedImplicitly]
         public bool UseHorse { get; set; }
 
         [LocDisplayName("{=1YsQ2fC3}Use Camel"),
          LocDescription("{=Us7G1v2T}Whether to allow camel (can be combined with Use Horse"),
-         PropertyOrder(8), UsedImplicitly]
+         PropertyOrder(9), UsedImplicitly]
         public bool UseCamel { get; set; }
 
         // Requested by Maku for Eagle Rising, which adds war elephants and chariots as mounts.
@@ -90,12 +95,12 @@ namespace BLTAdoptAHero
 
         [LocDisplayName("{=}Use Chariot (Heavy)"),
          LocDescription("{=}Heavy war chariots - in Eagle Rising, the Carthaginian two-horse chariot (charge 100, +400 health). Can be combined with the other mount options."),
-         PropertyOrder(9), UsedImplicitly]
+         PropertyOrder(10), UsedImplicitly]
         public bool UseHeavyChariot { get; set; }
 
         [LocDisplayName("{=}Use Chariot (Light)"),
          LocDescription("{=}Light chariots - in Eagle Rising, the Celtic chariot (charge 60, +200 health). Can be combined with the other mount options."),
-         PropertyOrder(10), UsedImplicitly]
+         PropertyOrder(11), UsedImplicitly]
         public bool UseChariot { get; set; }
 
         [LocDisplayName("{=MvddFKo4}Passive Power"),
@@ -135,6 +140,29 @@ namespace BLTAdoptAHero
         public IEnumerable<string> SlotItemNames
             => SlotItems.Select(s => s.GetDisplayName());
         // For UI
+        [YamlIgnore, Browsable(false)]
+        public bool HasWeaponFilter => !string.IsNullOrWhiteSpace(WeaponNameFilter);
+
+        /// <summary>
+        /// Whether a weapon passes this class's name filter. Matches on the item's id as well as
+        /// its displayed name, because an overhaul's weapon is often named "[Thracian]Iron Falx"
+        /// while the id is the part that stays put.
+        /// </summary>
+        public bool MatchesWeaponFilter(ItemObject item)
+        {
+            if (!HasWeaponFilter) return true;
+            if (item == null) return false;
+
+            string id = item.StringId?.ToLowerInvariant() ?? "";
+            string name = item.Name?.ToString().ToLowerInvariant() ?? "";
+
+            return WeaponNameFilter
+                .Split(',')
+                .Select(s => s.Trim().ToLowerInvariant())
+                .Where(s => s.Length > 0)
+                .Any(s => id.Contains(s) || name.Contains(s));
+        }
+
         [YamlIgnore, Browsable(false)]
         public string MountDescription
             => string.Join("/", new[]
