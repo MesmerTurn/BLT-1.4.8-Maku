@@ -449,7 +449,12 @@ namespace BLTAdoptAHero.Actions
                                         string heroName = StripTranslationKey(n.Name.ToString());
 
                                         bool clanMatch = clanName.StartsWith(spouseArg, StringComparison.CurrentCultureIgnoreCase) && !clanName.Contains("[BLT Clan]");
-                                        bool nameMatch = heroName.StartsWith(spouseArg, StringComparison.CurrentCultureIgnoreCase) && (n.Clan != null || !n.Clan.Name.ToString().Contains("[BLT Clan]"));
+                                        // The clan test used to read "n.Clan != null || !n.Clan.Name...", which
+                                        // is backwards: for a hero with no clan the first half is false, so the
+                                        // second half runs and dereferences the null clan. Any clanless hero
+                                        // among the candidates took the whole command down with it.
+                                        bool nameMatch = heroName.StartsWith(spouseArg, StringComparison.CurrentCultureIgnoreCase)
+                                                         && (n.Clan == null || !n.Clan.Name.ToString().Contains("[BLT Clan]"));
 
                                         ClanorName = true;
                                         return clanMatch || nameMatch;
