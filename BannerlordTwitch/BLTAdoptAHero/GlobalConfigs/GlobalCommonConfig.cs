@@ -1041,6 +1041,173 @@ namespace BLTAdoptAHero
                 Description = "Larger granaries store more food",
                 GoldCost = 8000,
                 FoodDailyFlat = 5.0f
+            },
+
+            // Second and third steps for the five above. Each one needs the step below it, so a
+            // fief is built up over a campaign instead of bought outright on day one.
+            new FiefUpgrade
+            {
+                ID = "fief_loyalty_2",
+                Name = "Court of Appeals",
+                Description = "Grievances are heard instead of festering. More loyalty.",
+                GoldCost = 45000,
+                RequiredUpgradeID = "fief_loyalty_1",
+                LoyaltyDailyFlat = 1.0f
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_prosperity_2",
+                Name = "Merchant Quarter",
+                Description = "A quarter given over to trade, and taxed for the privilege.",
+                GoldCost = 60000,
+                RequiredUpgradeID = "fief_prosperity_1",
+                ProsperityDailyFlat = 1.5f,
+                TaxIncomeFlat = 250
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_security_2",
+                Name = "Town Watch",
+                Description = "A standing watch walks the streets at night.",
+                GoldCost = 35000,
+                RequiredUpgradeID = "fief_security_1",
+                SecurityDailyFlat = 1.0f,
+                MilitiaDailyFlat = 1.0f
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_militia_2",
+                Name = "Drill Yards",
+                Description = "The militia train properly, and turn out better for it.",
+                GoldCost = 40000,
+                RequiredUpgradeID = "fief_militia_1",
+                MilitiaDailyFlat = 3.0f,
+                GarrisonTroopTierBonus = 1
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_food_2",
+                Name = "Deep Cellars",
+                Description = "Stores that survive a siege and a bad harvest alike.",
+                GoldCost = 30000,
+                RequiredUpgradeID = "fief_food_1",
+                FoodDailyFlat = 8.0f
+            },
+
+            // Walls and garrison
+            new FiefUpgrade
+            {
+                ID = "fief_garrison_1",
+                Name = "Barracks",
+                Description = "Room for a larger garrison.",
+                GoldCost = 35000,
+                GarrisonCapacityBonus = 50
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_garrison_2",
+                Name = "Great Barracks",
+                Description = "More room still, and recruits arriving steadily.",
+                GoldCost = 80000,
+                RequiredUpgradeID = "fief_garrison_1",
+                GarrisonCapacityBonus = 100,
+                GarrisonDailyTroopSpawnAmount = 1.0f
+            },
+
+            // Money
+            new FiefUpgrade
+            {
+                ID = "fief_tax_1",
+                Name = "Tax Office",
+                Description = "Someone finally counts what is owed.",
+                GoldCost = 25000,
+                TaxIncomeFlat = 300
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_tax_2",
+                Name = "Customs House",
+                Description = "Every cart through the gate pays its share.",
+                GoldCost = 70000,
+                RequiredUpgradeID = "fief_tax_1",
+                TaxIncomePercent = 15f
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_harbour_1",
+                Name = "Harbour Works",
+                Description = "Coastal fiefs only. Trade by sea pays better than trade by road.",
+                GoldCost = 55000,
+                CoastalOnly = true,
+                ProsperityDailyFlat = 1.0f,
+                TaxIncomeFlat = 400
+            },
+
+            // The villages that feed the place
+            new FiefUpgrade
+            {
+                ID = "fief_hearths_1",
+                Name = "Land Grants",
+                Description = "Families settled on good land. The villages grow.",
+                GoldCost = 30000,
+                HearthDaily = 1.0f
+            },
+
+            // Thieves' guild: asked for by Maku. Money from the underworld, paid for in security
+            // and loyalty rather than gold alone - a fief with a guild in it is richer and worse
+            // governed, which is the point.
+            new FiefUpgrade
+            {
+                ID = "fief_thieves_1",
+                Name = "Thieves' Guild",
+                Description = "The local thieves are organised, and pay you to be left alone. Money now, security later.",
+                GoldCost = 25000,
+                TaxIncomeFlat = 500,
+                SecurityDailyFlat = -0.3f
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_thieves_2",
+                Name = "The Fence",
+                Description = "Stolen goods move through your market, and every piece is taxed.",
+                GoldCost = 60000,
+                RequiredUpgradeID = "fief_thieves_1",
+                TaxIncomeFlat = 900,
+                SecurityDailyFlat = -0.4f,
+                LoyaltyDailyFlat = -0.2f
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_thieves_3",
+                Name = "Guildmaster's Tribute",
+                Description = "The guild answers to you now. They pay well, and the watch looks elsewhere.",
+                GoldCost = 120000,
+                RequiredUpgradeID = "fief_thieves_2",
+                TaxIncomePercent = 20f,
+                TaxIncomeFlat = 1200,
+                SecurityDailyFlat = -0.5f,
+                LoyaltyDailyFlat = -0.3f
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_thieves_smugglers",
+                Name = "Smugglers' Docks",
+                Description = "Coastal fiefs only. Cargo that never troubles the customs house.",
+                GoldCost = 80000,
+                RequiredUpgradeID = "fief_thieves_1",
+                CoastalOnly = true,
+                TaxIncomeFlat = 1000,
+                SecurityDailyFlat = -0.4f
+            },
+            new FiefUpgrade
+            {
+                ID = "fief_thieves_amnesty",
+                Name = "Guild Amnesty",
+                Description = "Buy the guild off and put the watch back on the streets. Cleans up what the guild costs you, and keeps a little of the money.",
+                GoldCost = 90000,
+                RequiredUpgradeID = "fief_thieves_1",
+                SecurityDailyFlat = 1.2f,
+                LoyaltyDailyFlat = 0.5f
             }
         };
 
@@ -1075,6 +1242,53 @@ namespace BLTAdoptAHero
                 GoldCost = 50000,
                 LoyaltyDailyFlat = 0.3f,
                 ProsperityDailyFlat = 0.5f
+            },
+            new ClanUpgrade
+            {
+                ID = "clan_renown_2",
+                Name = "Songs and Storytellers",
+                Description = "Your deeds are sung in halls you have never entered.",
+                GoldCost = 70000,
+                RequiredUpgradeID = "clan_renown_1",
+                RenownDaily = 2.0f,
+                InfluenceDaily = 0.5f
+            },
+            new ClanUpgrade
+            {
+                ID = "clan_party_2",
+                Name = "Veteran Retainers",
+                Description = "Bigger companies, and they keep up on the march.",
+                GoldCost = 90000,
+                RequiredUpgradeID = "clan_party_1",
+                PartySizeBonus = 30,
+                PartySpeedBonus = 0.3f
+            },
+            new ClanUpgrade
+            {
+                ID = "clan_outriders",
+                Name = "Outriders",
+                Description = "Scouts ahead of the column. The clan moves faster.",
+                GoldCost = 45000,
+                PartySpeedBonus = 0.5f
+            },
+            new ClanUpgrade
+            {
+                ID = "clan_court",
+                Name = "Clan Court",
+                Description = "Lords only. A seat of your own, and the influence that comes with it.",
+                GoldCost = 100000,
+                LordOnly = true,
+                InfluenceDaily = 1.5f,
+                RenownDaily = 1.0f
+            },
+            new ClanUpgrade
+            {
+                ID = "clan_contracts",
+                Name = "Better Contracts",
+                Description = "Mercenaries only. Your company charges what it is worth.",
+                GoldCost = 60000,
+                MercOnly = true,
+                MercIncomeFlat = 500
             }
         };
 
