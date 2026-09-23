@@ -82,24 +82,30 @@ namespace BLTAdoptAHero
         // Requested by Maku for Eagle Rising, which adds war elephants and chariots as mounts.
         // Both are recognised by the id of the creature they use rather than its family number,
         // because mods number their custom creatures freely.
-        [LocDisplayName("{=}Use Elephant"),
-         LocDescription("{=}Whether to allow war elephants (mods such as Eagle Rising). Can be combined with the other mount options."),
-         PropertyOrder(9), UsedImplicitly]
+        // Elephants were dropped: Eagle Rising has no rideable elephant, only Carthaginian armour
+        // named after them. The setting stays so older config files still load, but it is out of
+        // the editor and does nothing.
+        [Browsable(false), UsedImplicitly]
         public bool UseElephant { get; set; }
 
-        [LocDisplayName("{=}Use Chariot"),
-         LocDescription("{=}Whether to allow chariots (mods such as Eagle Rising). Can be combined with the other mount options."),
+        [LocDisplayName("{=}Use Chariot (Heavy)"),
+         LocDescription("{=}Heavy war chariots - in Eagle Rising, the Carthaginian two-horse chariot (charge 100, +400 health). Can be combined with the other mount options."),
+         PropertyOrder(9), UsedImplicitly]
+        public bool UseHeavyChariot { get; set; }
+
+        [LocDisplayName("{=}Use Chariot (Light)"),
+         LocDescription("{=}Light chariots - in Eagle Rising, the Celtic chariot (charge 60, +200 health). Can be combined with the other mount options."),
          PropertyOrder(10), UsedImplicitly]
         public bool UseChariot { get; set; }
 
         [LocDisplayName("{=MvddFKo4}Passive Power"),
          LocDescription("{=F8a2nXYo}Passive hero power: this will always apply to the hero (i.e. a permanent buff)"),
-         PropertyOrder(11), ExpandableObject, Expand, UsedImplicitly]
+         PropertyOrder(12), ExpandableObject, Expand, UsedImplicitly]
         public PassivePowerGroup PassivePower { get; set; } = new() { Name = "{=MvddFKo4}Passive Power" };
 
         [LocDisplayName("{=wdCMNOGd}Active Power"),
          LocDescription("{=I4ASwveG}Active hero power: this power will be triggered only when the UseHeroPower action is used by the viewer, via reward or command (i.e. a temporary buff)"),
-         PropertyOrder(12), ExpandableObject, Expand, UsedImplicitly]
+         PropertyOrder(13), ExpandableObject, Expand, UsedImplicitly]
         public ActivePowerGroup ActivePower { get; set; } = new() { Name = "{=wdCMNOGd}Active Power" };
         #endregion
 
@@ -135,22 +141,31 @@ namespace BLTAdoptAHero
             {
                 UseHorse ? "{=YzIcRgBV}Horse".Translate() : null,
                 UseCamel ? "{=HMclWXR8}Camel".Translate() : null,
-                UseElephant ? "{=}Elephant".Translate() : null,
-                UseChariot ? "{=}Chariot".Translate() : null,
+                UseHeavyChariot ? "{=}Heavy Chariot".Translate() : null,
+                UseChariot ? "{=}Light Chariot".Translate() : null,
             }.Where(s => s != null));
 
         /// <summary>
-        /// Whether this class may ride the given mount. Elephants and chariots are told apart by
-        /// the id of their creature; everything else by the game's own horse/camel family.
+        /// Whether this class may ride the given mount. Chariots are told apart by the creature
+        /// they use, and heavy from light by charge damage; everything else by the game's own
+        /// horse/camel family.
         /// </summary>
+        private const int HeavyChariotChargeDamage = 80;
+
         public bool AllowsMount(ItemObject item)
         {
             var monster = item?.HorseComponent?.Monster;
             if (monster == null) return false;
 
             string id = monster.StringId?.ToLowerInvariant() ?? "";
-            if (id.Contains("chariot")) return UseChariot;
-            if (id.Contains("elephant") || id.Contains("mumak")) return UseElephant;
+            if (id.Contains("chariot"))
+            {
+                // Heavy and light are told apart by charge damage rather than by item id, so a
+                // chariot added in a later version of the mod lands in the right bucket on its own.
+                // Eagle Rising's two: Carthaginian 100, Celtic 60.
+                bool heavy = (item.HorseComponent?.ChargeDamage ?? 0) >= HeavyChariotChargeDamage;
+                return heavy ? UseHeavyChariot : UseChariot;
+            }
 
             return UseHorse && monster.FamilyType == (int)EquipHero.MountFamilyType.horse
                    || UseCamel && monster.FamilyType == (int)EquipHero.MountFamilyType.camel;
@@ -165,7 +180,7 @@ namespace BLTAdoptAHero
             => IndexedSlots.Where(s => s.type is not (EquipmentType.None or EquipmentType.Shield));
 
         [YamlIgnore, Browsable(false)]
-        public bool Mounted => UseHorse || UseCamel || UseElephant || UseChariot;
+        public bool Mounted => UseHorse || UseCamel || UseChariot || UseHeavyChariot;
 
         [YamlIgnore, Browsable(false)]
         public IEnumerable<SkillObject> WeaponSkills =>
@@ -198,8 +213,8 @@ namespace BLTAdoptAHero
             $"{Name} : {string.Join(", ", SlotItems.Select(s => s.ToString()))}"
             + (UseHorse ? " (" + "{=A1G6bq0G}Use Horse".Translate() + ")" : "")
             + (UseCamel ? " (" + "{=FpgyZk0F}Use Camel".Translate() + ")" : "")
-            + (UseElephant ? " (" + "{=}Use Elephant".Translate() + ")" : "")
-            + (UseChariot ? " (" + "{=}Use Chariot".Translate() + ")" : "");
+            + (UseHeavyChariot ? " (" + "{=}Use Heavy Chariot".Translate() + ")" : "")
+            + (UseChariot ? " (" + "{=}Use Light Chariot".Translate() + ")" : "");
 
         #endregion
 
