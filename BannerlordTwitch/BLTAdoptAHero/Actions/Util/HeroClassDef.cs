@@ -69,24 +69,29 @@ namespace BLTAdoptAHero
          PropertyOrder(6), UsedImplicitly]
         public EquipmentType Slot4 { get; set; }
 
+        [LocDisplayName("{=}Weapon Name Filter"),
+         LocDescription("{=}Comma separated words. A weapon is only given to this class if its name or id contains one of them - so 'falx' on a Two Handed Sword slot gives Thracian falxes and nothing else, and 'sarissa' on a Two Handed Lance slot gives sarissas. Leave blank for no filter. If nothing in the game matches, the slot falls back to any weapon of its type rather than leaving the hero unarmed."),
+         PropertyOrder(7), UsedImplicitly]
+        public string WeaponNameFilter { get; set; } = "";
+
         [LocDisplayName("{=MdYmGuin}Use Horse"),
          LocDescription("{=Q00NX1J9}Whether to allow horse (can be combined with Use Camel)"),
-         PropertyOrder(7), UsedImplicitly]
+         PropertyOrder(8), UsedImplicitly]
         public bool UseHorse { get; set; }
 
         [LocDisplayName("{=1YsQ2fC3}Use Camel"),
          LocDescription("{=Us7G1v2T}Whether to allow camel (can be combined with Use Horse"),
-         PropertyOrder(8), UsedImplicitly]
+         PropertyOrder(9), UsedImplicitly]
         public bool UseCamel { get; set; }
 
         [LocDisplayName("{=MvddFKo4}Passive Power"),
          LocDescription("{=F8a2nXYo}Passive hero power: this will always apply to the hero (i.e. a permanent buff)"),
-         PropertyOrder(9), ExpandableObject, Expand, UsedImplicitly]
+         PropertyOrder(10), ExpandableObject, Expand, UsedImplicitly]
         public PassivePowerGroup PassivePower { get; set; } = new() { Name = "{=MvddFKo4}Passive Power" };
 
         [LocDisplayName("{=wdCMNOGd}Active Power"),
          LocDescription("{=I4ASwveG}Active hero power: this power will be triggered only when the UseHeroPower action is used by the viewer, via reward or command (i.e. a temporary buff)"),
-         PropertyOrder(10), ExpandableObject, Expand, UsedImplicitly]
+         PropertyOrder(11), ExpandableObject, Expand, UsedImplicitly]
         public ActivePowerGroup ActivePower { get; set; } = new() { Name = "{=wdCMNOGd}Active Power" };
         #endregion
 
@@ -116,6 +121,29 @@ namespace BLTAdoptAHero
         public IEnumerable<string> SlotItemNames
             => SlotItems.Select(s => s.GetDisplayName());
         // For UI
+        [YamlIgnore, Browsable(false)]
+        public bool HasWeaponFilter => !string.IsNullOrWhiteSpace(WeaponNameFilter);
+
+        /// <summary>
+        /// Whether a weapon passes this class's name filter. Matches on the item's id as well as
+        /// its displayed name, because an overhaul's weapon is often named "[Thracian]Iron Falx"
+        /// while the id is the part that stays put.
+        /// </summary>
+        public bool MatchesWeaponFilter(ItemObject item)
+        {
+            if (!HasWeaponFilter) return true;
+            if (item == null) return false;
+
+            string id = item.StringId?.ToLowerInvariant() ?? "";
+            string name = item.Name?.ToString().ToLowerInvariant() ?? "";
+
+            return WeaponNameFilter
+                .Split(',')
+                .Select(s => s.Trim().ToLowerInvariant())
+                .Where(s => s.Length > 0)
+                .Any(s => id.Contains(s) || name.Contains(s));
+        }
+
         [YamlIgnore, Browsable(false)]
         public string MountDescription
             => (UseHorse ? "{=YzIcRgBV}Horse".Translate() : "") +

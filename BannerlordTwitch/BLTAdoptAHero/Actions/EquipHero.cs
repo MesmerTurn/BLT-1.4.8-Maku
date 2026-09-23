@@ -324,8 +324,17 @@ namespace BLTAdoptAHero
                 foreach (var (equipmentType, slot) in classDef.SlotItems
                             .Zip(adoptedHero.BattleEquipment.YieldWeaponSlots(), (equipmentType, slot) => (equipmentType, slot)))
                 {
-                    var weapon = FindNewEquipment(e => e.IsEquipmentType(equipmentType),
+                    var weapon = FindNewEquipment(
+                        e => e.IsEquipmentType(equipmentType) && classDef.MatchesWeaponFilter(e),
                         equipmentType == EquipmentType.Stone ? FindFlags.AllowNonMerchandise : FindFlags.None);
+
+                    // A filter that matches nothing must not leave the hero unarmed - fall back to
+                    // the slot's own type, which is what they would have had anyway.
+                    if (weapon.IsEmpty && classDef.HasWeaponFilter)
+                    {
+                        weapon = FindNewEquipment(e => e.IsEquipmentType(equipmentType),
+                            equipmentType == EquipmentType.Stone ? FindFlags.AllowNonMerchandise : FindFlags.None);
+                    }
                     if (!weapon.IsEmpty)
                     {
                         adoptedHero.BattleEquipment[slot.index] = weapon;
