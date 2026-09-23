@@ -33,21 +33,28 @@ namespace BLTBuffet
 
             public void Apply(float dt)
             {
-                if (config.HealPerSecond != 0 && config.HealPercent != 0)
-                {
-                    agent.Health = Math.Min(agent.HealthLimit, agent.Health + Math.Abs(config.HealPerSecond + config.HealPercent * agent.HealthLimit / 100) * dt);
-                }
+                Heal(agent, dt);
 
-                if (config.HealPerSecond != 0 && config.HealPercent == 0)
-                {
-                    agent.Health = Math.Min(agent.HealthLimit, agent.Health + Math.Abs(config.HealPerSecond) * dt);
-                }
+                // Asked for by Maku: a healing effect that leaves the horse bleeding out under you
+                // is only half a heal - lose the horse and a cavalry hero is finished anyway.
+                if (config.HealMount) Heal(agent?.MountAgent, dt);
 
-                if (config.HealPercent != 0 && config.HealPerSecond == 0)
-                {
-                    agent.Health = Math.Min(agent.HealthLimit, agent.Health + Math.Abs(config.HealPercent * agent.HealthLimit / 100) * dt);
-                }
+                ApplyDamage(dt);
+            }
 
+            private void Heal(Agent target, float dt)
+            {
+                if (target == null || !target.IsActive()) return;
+
+                float perSecond = Math.Abs(config.HealPerSecond)
+                                  + Math.Abs(config.HealPercent) * target.HealthLimit / 100f;
+                if (perSecond <= 0) return;
+
+                target.Health = Math.Min(target.HealthLimit, target.Health + perSecond * dt);
+            }
+
+            private void ApplyDamage(float dt)
+            {
                 if (config.DamagePerSecond != 0 && agent.CurrentMortalityState == Agent.MortalityState.Mortal && Mission.Current?.DisableDying != true)
                 {
                     var blow = new Blow(agent.Index)

@@ -140,6 +140,11 @@ namespace BLTBuffet
              PropertyOrder(9), UsedImplicitly]
             public float HealPercent { get; set; }
 
+        [LocDisplayName("{=}Heal Mount"),
+         LocDescription("{=}Heal the hero's horse at the same rate as the hero. A healing effect that leaves the horse dying under them is only half a heal."),
+         PropertyOrder(10), UsedImplicitly]
+        public bool HealMount { get; set; } = true;
+
             [LocDisplayName("{=6Ikuo9Yl}Damage Per Second"),
              LocDescription("{=cQBHZWwK}Damage amount per second"),
              PropertyOrder(10), UsedImplicitly]

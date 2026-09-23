@@ -417,6 +417,7 @@
     <Compile Include="Behaviors\SiegeDeploymentDiagnostic.cs" />
     <Compile Include="Actions\GuardCommand.cs" />
     <Compile Include="Actions\RallyCommand.cs" />
+    <Compile Include="Actions\CompanionsCommand.cs" />
     <Compile Include="Actions\WarHornCommand.cs" />
     <Compile Include="Actions\MarkCommand.cs" />
     <Compile Include="Actions\BattleEventCommands.cs" />

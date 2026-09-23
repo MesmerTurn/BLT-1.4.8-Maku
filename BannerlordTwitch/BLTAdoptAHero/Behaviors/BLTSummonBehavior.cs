@@ -374,6 +374,19 @@ namespace BLTAdoptAHero
 
                     if (agent == null) continue;
 
+                    // Show whose companion this is, the same way retinue is labelled. Asked for by
+                    // Maku: companions were on the field but indistinguishable from any other
+                    // soldier, so nobody could tell they had turned up at all.
+                    try
+                    {
+                        AccessTools.Field(typeof(Agent), "_name")?.SetValue(agent,
+                            new TextObject($"{companion.FirstName} ({adoptedHero.FirstName})"));
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Trace($"[Summon] Could not name companion agent: {ex.Message}");
+                    }
+
                     // Kills by a companion pay their viewer, the same way a retinue kill does -
                     // the companion is theirs, and it is their gold that bought them.
                     BLTAdoptAHeroCustomMissionBehavior.Current.AddListeners(agent,
