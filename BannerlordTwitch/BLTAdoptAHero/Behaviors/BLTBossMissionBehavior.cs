@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using BannerlordTwitch.Helpers;
 using BannerlordTwitch.Localization;
 using BannerlordTwitch.Util;
@@ -862,6 +863,7 @@ namespace BLTAdoptAHero
                     if (cfg?.BossNeverFlees == true)
                     {
                         state.Agent.SetMorale(100f);
+                        StopFleeing(state.Agent);
                     }
 
                     // Keep the class's active powers permanently up - they're duration-based for
@@ -982,6 +984,39 @@ namespace BLTAdoptAHero
 
                 Log.LogFeedEvent($"{killerHero.Name} slew {state.DisplayName}! +{gold}{Naming.Gold} +{xp}XP");
             });
+        }
+
+        // Set once: a private setter and a private method, looked up by name so a rename in a
+        // future game version costs us the feature rather than throwing on every tick.
+        private static readonly PropertyInfo IsRunningAwayProperty =
+            AccessTools.Property(typeof(Agent), "IsRunningAway");
+        private static readonly MethodInfo SetPerformingRetreatBehavior =
+            AccessTools.Method(typeof(Agent), "SetAgentAIPerformingRetreatBehavior");
+
+        /// <summary>
+        /// Reported by Maku: with RBM installed, bosses still run. Holding morale at 100 only
+        /// stops the game's own morale system from breaking them - RBM decides retreats with its
+        /// own AI and puts an agent into the fleeing state directly, morale untouched.
+        ///
+        /// So rather than arguing about morale, this cancels the retreat itself every tick,
+        /// whoever ordered it.
+        /// </summary>
+        private static void StopFleeing(Agent agent)
+        {
+            try
+            {
+                bool running = agent.IsRunningAway;
+                if (!running && !agent.IsRetreating()) return;
+
+                agent.StopRetreating();
+                IsRunningAwayProperty?.SetValue(agent, false);
+                SetPerformingRetreatBehavior?.Invoke(agent, new object[] { false });
+                agent.SetMorale(100f);
+            }
+            catch (Exception ex)
+            {
+                Log.Trace($"[Boss] Could not stop {agent?.Name} fleeing: {ex.Message}");
+            }
         }
 
         protected override void OnEndMission()
