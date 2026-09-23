@@ -486,6 +486,12 @@ namespace BLTAdoptAHero
          PropertyOrder(40), UsedImplicitly]
         public bool CompanionsUsePowers { get; set; } = true;
 
+        [LocDisplayName("{=}Companion XP Share Percent"),
+         LocCategory("General", "{=C5T6nnix}General"),
+         LocDescription("{=}Percent of every bit of XP a viewer's hero earns that their companions also receive, in the same skill. Keeps promoted companions in step with the hero they follow instead of being stuck at the level their troop happened to be. 0 disables it."),
+         Range(0, 100), PropertyOrder(41), UsedImplicitly]
+        public float CompanionXpSharePercent { get; set; } = 25f;
+
         #region Battle Events
         [LocDisplayName("{=}Berserker Frenzy"),
          LocCategory("BattleEvents", "{=}Battle Events"),

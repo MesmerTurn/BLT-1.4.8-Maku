@@ -54,6 +54,42 @@ namespace BLTAdoptAHero
             return ImproveSkill(adoptedHero, amount, settings.Skills, settings.Auto);
         }
 
+        /// <summary>
+        /// Companions get a share of whatever their hero earns, in the same skill.
+        ///
+        /// Asked for by Maku: a promoted companion arrived at the level their troop happened to be
+        /// and stayed there forever, while the viewer they follow pulled further and further ahead.
+        /// Paying them out of the hero's own earnings keeps them roughly in step without giving
+        /// them a separate economy to balance.
+        /// </summary>
+        private static void ShareWithCompanions(Hero hero, SkillObject skill, int amount)
+        {
+            float share = BLTAdoptAHeroModule.CommonConfig?.CompanionXpSharePercent ?? 0f;
+            if (share <= 0 || amount <= 0 || skill == null) return;
+
+            var clan = hero?.Clan;
+            if (clan?.Leader != hero) return;
+
+            try
+            {
+                int companionAmount = (int)(amount * share / 100f);
+                if (companionAmount <= 0) return;
+
+                foreach (var companion in clan.Companions.ToArray())
+                {
+                    if (companion == null || companion == hero || companion.IsDead) continue;
+
+                    companion.HeroDeveloper.AddSkillXp(skill, companionAmount,
+                        isAffectedByFocusFactor: !BLTAdoptAHeroModule.CommonConfig.UseRawXP);
+                    companion.HeroDeveloper.DevelopCharacterStats();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Exception($"{nameof(SkillXP)}.{nameof(ShareWithCompanions)}", ex);
+            }
+        }
+
         public static (bool success, string description) ImproveSkill(Hero hero, int amount, SkillsEnum skills, bool auto)
         {
             var skill = GetSkill(hero, skills, auto, so
@@ -72,6 +108,8 @@ namespace BLTAdoptAHero
                 isAffectedByFocusFactor: !BLTAdoptAHeroModule.CommonConfig.UseRawXP);
             // Force this immediately instead of waiting for the daily campaign tick
             hero.HeroDeveloper.DevelopCharacterStats();
+
+            ShareWithCompanions(hero, skill, amount);
 
             int newXp = hero.HeroDeveloper.GetSkillXpProgress(skill);
             int realGainedXp = newXp - prevSkill;
