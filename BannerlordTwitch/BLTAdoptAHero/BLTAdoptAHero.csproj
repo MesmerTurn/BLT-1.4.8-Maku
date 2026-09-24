@@ -418,6 +418,9 @@
     <Compile Include="Actions\GuardCommand.cs" />
     <Compile Include="Actions\RallyCommand.cs" />
     <Compile Include="Actions\CompanionsCommand.cs" />
+    <Compile Include="Actions\BuyCompanionCommand.cs" />
+    <Compile Include="Actions\CompanionCommand.cs" />
+    <Compile Include="Actions\WandererAuction.cs" />
     <Compile Include="Actions\WarHornCommand.cs" />
     <Compile Include="Actions\MarkCommand.cs" />
     <Compile Include="Actions\BattleEventCommands.cs" />
@@ -425,6 +428,7 @@
     <Compile Include="Behaviors\BLTRallyBehavior.cs" />
     <Compile Include="Actions\UnguardCommand.cs" />
     <Compile Include="Behaviors\BLTStrayHeroCleanupBehavior.cs" />
+    <Compile Include="Behaviors\BLTHiredCompanionBehavior.cs" />
     <Compile Include="Actions\FollowCommand.cs" />
     <Compile Include="Behaviors\BLTGuardBehavior.cs" />
     <Compile Include="Behaviors\BLTFollowBehavior.cs" />

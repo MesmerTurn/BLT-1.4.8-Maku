@@ -486,6 +486,18 @@ namespace BLTAdoptAHero
          PropertyOrder(40), UsedImplicitly]
         public bool CompanionsUsePowers { get; set; } = true;
 
+        [LocDisplayName("{=}Hired Companions Climb Tiers"),
+         LocCategory("General", "{=C5T6nnix}General"),
+         LocDescription("{=}Companions hired with !buycompanion move up an equipment tier when the average of their class's own fighting skills passes the next threshold. Checked once a day. Turn off to leave them at the tier they were bought at."),
+         PropertyOrder(42), UsedImplicitly]
+        public bool CompanionTiersEnabled { get; set; } = true;
+
+        [LocDisplayName("{=}Companion Tier Thresholds"),
+         LocCategory("General", "{=C5T6nnix}General"),
+         LocDescription("{=}Skill averages needed to leave each tier, lowest first, comma separated. The first number is what takes a companion from tier 1 to tier 2. A companion levels these skills simply by fighting in their own kit."),
+         PropertyOrder(43), UsedImplicitly]
+        public string CompanionTierThresholds { get; set; } = "90, 110, 140, 170, 190";
+
         [LocDisplayName("{=}Companion XP Share Percent"),
          LocCategory("General", "{=C5T6nnix}General"),
          LocDescription("{=}Percent of every bit of XP a viewer's hero earns that their companions also receive, in the same skill. Keeps promoted companions in step with the hero they follow instead of being stuck at the level their troop happened to be. 0 disables it."),
