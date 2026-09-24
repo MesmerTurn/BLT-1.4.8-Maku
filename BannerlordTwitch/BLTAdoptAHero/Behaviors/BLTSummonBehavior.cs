@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
@@ -45,6 +46,11 @@ namespace BLTAdoptAHero
             // Companions brought in with this hero, with where they were before, so they can be put
             // back after the battle instead of staying in the party they were spawned from.
             public List<(Hero Hero, MobileParty From, Settlement At)> Companions { get; set; } = new();
+
+            // Everyone who has already been brought into THIS battle, alive or dead. A companion
+            // who has fallen stays fallen: the hero may be summoned again, their companions are
+            // not, or dying would simply hand the viewer a fresh set of them.
+            public HashSet<Hero> CompanionsSpawned { get; } = new();
 
             public int ActiveRetinue => Retinue.Count(r => r.State == AgentState.Active);
             public int DeadRetinue => Retinue.Count(r => r.Died);
@@ -125,7 +131,16 @@ namespace BLTAdoptAHero
                     var formationClass = agent.Formation.FormationIndex;
                     SpawnRetinue(adoptedHero, ShouldBeMounted(formationClass), formationClass,
                         heroSummonState, heroSummonState.WasPlayerSide);
+                }
 
+                // Companions come in on EVERY summon, and whether or not retinue is allowed here.
+                // They used to be tied to the retinue's one-off spawn, which meant a viewer who
+                // was killed and summoned again fought the rest of the battle alone, and a battle
+                // where retinue is not allowed never showed them at all. That is what !comp was
+                // really working around. SpawnCompanions skips anyone already on the field, so
+                // calling it again costs nothing.
+                {
+                    var formationClass = agent.Formation.FormationIndex;
                     SpawnCompanions(adoptedHero, ShouldBeMounted(formationClass), formationClass,
                         heroSummonState, heroSummonState.WasPlayerSide);
                 }
@@ -271,7 +286,7 @@ namespace BLTAdoptAHero
                 {
                     foreach (var r in h.Retinue.Where(r => r.State != AgentState.Killed))
                     {
-                        h.Party?.MemberRoster?.AddToCounts(r.Troop, -1);
+                        RemoveOne(h.Party?.MemberRoster, r.Troop);
                     }
 
                     // Companions too. Only retinue used to be taken back out, so every companion
@@ -287,6 +302,34 @@ namespace BLTAdoptAHero
         }
 
         /// <summary>
+        /// Takes one of a troop back out of a roster, and only if it is actually in there.
+        ///
+        /// This used to be AddToCounts(troop, -1) with no check at all. Subtracting a troop a
+        /// party no longer has drives that entry's count negative, and a TroopRoster with a
+        /// negative count is quietly corrupt: its own index tables no longer agree with what it
+        /// holds. The game then crashes later, in whatever innocent code walks that roster next -
+        /// in Maku's reports, the party morale calculation during the AI's hourly tick, with BLT
+        /// nowhere in the callstack.
+        /// </summary>
+        private static void RemoveOne(TroopRoster roster, CharacterObject troop)
+        {
+            if (roster == null || troop == null) return;
+
+            try
+            {
+                int index = roster.FindIndexOfTroop(troop);
+                if (index < 0) return;
+                if (roster.GetElementNumber(index) <= 0) return;
+
+                roster.AddToCounts(troop, -1);
+            }
+            catch (Exception ex)
+            {
+                Log.Exception($"{nameof(BLTSummonBehavior)}.{nameof(RemoveOne)}", ex);
+            }
+        }
+
+        /// <summary>
         /// Takes a summoned companion back out of the party they were spawned from and returns
         /// them to where they were: their own party, or the settlement they were waiting in.
         /// </summary>
@@ -298,7 +341,9 @@ namespace BLTAdoptAHero
             if (now != null && now == from) return;               // they came from this party
             if (spawnedFrom?.MobileParty != null && spawnedFrom.MobileParty == from) return;
 
-            if (now != null && now.LeaderHero != hero)
+            // Same rule as everywhere else here: never take out of a roster something it does not
+            // hold, because that is what leaves the roster corrupt.
+            if (now != null && now.LeaderHero != hero && now.MemberRoster.Contains(hero.CharacterObject))
                 now.MemberRoster.RemoveTroop(hero.CharacterObject);
             else if (spawnedFrom?.MemberRoster != null && spawnedFrom.MemberRoster.Contains(hero.CharacterObject))
                 spawnedFrom.MemberRoster.RemoveTroop(hero.CharacterObject);
@@ -342,9 +387,18 @@ namespace BLTAdoptAHero
                 var clan = adoptedHero.Clan;
                 if (clan == null || clan.Leader != adoptedHero) return;
 
-                var companions = clan.Companions?
+                // Clan companions plus anyone this viewer has hired. A hired companion who has
+                // been given a noble title is no longer "companion of" the clan as far as the
+                // game is concerned, and would otherwise stop turning up to battles the moment
+                // they were promoted.
+                var campaign = BLTAdoptAHeroCampaignBehavior.Current;
+                var companions = (clan.Companions ?? Enumerable.Empty<Hero>())
+                    .Concat(campaign?.GetHiredCompanions(adoptedHero) ?? Enumerable.Empty<Hero>())
+                    .Distinct()
                     .Where(c => c != null && !c.IsDead && c != adoptedHero)
                     .Where(c => c.PartyBelongedTo == null || c.PartyBelongedTo == adoptedHero.PartyBelongedTo)
+                    // Nobody comes in twice in one battle, whatever happened to them the first time.
+                    .Where(c => !existingHero.CompanionsSpawned.Contains(c))
                     .ToList();
 
                 if (companions == null || companions.Count == 0) return;
@@ -366,8 +420,15 @@ namespace BLTAdoptAHero
                     if (onPlayerSide && cfg.RetinueUseHeroesFormation)
                         Campaign.Current.SetPlayerFormationPreference(troop, ownerFormationClass);
 
+                    existingHero.CompanionsSpawned.Add(companion);
                     existingHero.Companions.Add((companion, companion.PartyBelongedTo, companion.CurrentSettlement));
-                    existingHero.Party.MemberRoster.AddToCounts(troop, 1);
+
+                    // Only put them in the roster if they are not already in it. A companion who
+                    // already travels with this party would otherwise be added a second time, and
+                    // a TroopRoster holding the same hero twice has broken index tables - the
+                    // crash then happens later, in whatever walks that roster next.
+                    if (!existingHero.Party.MemberRoster.Contains(troop))
+                        existingHero.Party.MemberRoster.AddToCounts(troop, 1);
 
                     var agent = SpawnAgent(onPlayerSide, troop, existingHero.Party,
                         troop.IsMounted && mounted, false, !deploymentFlag);

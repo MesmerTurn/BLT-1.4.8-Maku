@@ -83,6 +83,12 @@ namespace BLTAdoptAHero
         {
             if (hero == null || hero == Hero.MainHero) return false;
             if (hero == party.LeaderHero) return false;
+
+            // A hired companion is somebody's property, bought and paid for. One hired by a viewer
+            // with no clan of their own has no clan and is nobody's "companion of" either, which
+            // is exactly the shape this sweep was built to delete - so check it explicitly before
+            // anything else, or we would quietly destroy what a viewer spent 250,000 on.
+            if (BLTAdoptAHeroCampaignBehavior.Current?.IsHiredCompanion(hero) == true) return false;
             if (IsForeignAscendedLord(hero, party)) return true;
             if (IsForeignCompanion(hero, party)) return true;
             if (hero.Clan != null || hero.CompanionOf != null) return false;

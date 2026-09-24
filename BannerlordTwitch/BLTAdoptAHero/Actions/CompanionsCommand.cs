@@ -50,9 +50,17 @@ namespace BLTAdoptAHero.Actions
             }
 
             var clan = adoptedHero.Clan;
-            var companions = clan?.Companions?
+            var campaign = BLTAdoptAHeroCampaignBehavior.Current;
+
+            // Both kinds, and no duplicates: the clan's companions, plus everyone this viewer has
+            // hired. A hired companion given a noble title stops being a "companion of" the clan
+            // in the game's eyes, and would otherwise vanish from this list the moment they were
+            // promoted - which is precisely when a viewer wants to see them.
+            var companions = (clan?.Companions ?? Enumerable.Empty<Hero>())
+                .Concat(campaign?.GetHiredCompanions(adoptedHero) ?? Enumerable.Empty<Hero>())
                 .Where(c => c != null && c != adoptedHero && !c.IsDead)
-                .ToList() ?? new List<Hero>();
+                .Distinct()
+                .ToList();
 
             if (companions.Count == 0)
             {
@@ -63,15 +71,39 @@ namespace BLTAdoptAHero.Actions
             int listed = Math.Max(1, settings.MaxListed);
             var parts = companions
                 .Take(listed)
-                .Select(c => settings.ShowLocation
-                    ? $"{c.FirstName} (lvl {c.Level}, {WhereIs(c)})"
-                    : $"{c.FirstName} (lvl {c.Level})");
+                .Select(c => Describe(c, settings.ShowLocation));
 
             string message = string.Join(", ", parts);
             if (companions.Count > listed)
                 message += $" and {companions.Count - listed} more";
 
             onSuccess($"{companions.Count} companions: {message}");
+        }
+
+        /// <summary>
+        /// One companion in a line of chat: their class and equipment tier when they are a hired
+        /// companion, their level when they are not, and where they are.
+        /// </summary>
+        private static string Describe(Hero companion, bool showLocation)
+        {
+            var campaign = BLTAdoptAHeroCampaignBehavior.Current;
+            string what = $"lvl {companion.Level}";
+
+            if (campaign?.IsHiredCompanion(companion) == true)
+            {
+                var classDef = campaign.GetClass(companion);
+                int tier = campaign.GetEquipmentTier(companion) + 1;
+                what = classDef != null ? $"{classDef.Name} T{tier}" : $"T{tier}";
+
+                // How close they are to the next tier, so a viewer can see them climbing rather
+                // than wondering whether anything is happening at all.
+                string progress = BLTHiredCompanionBehavior.ProgressText(companion);
+                if (!string.IsNullOrEmpty(progress)) what += $", {progress}";
+            }
+
+            return showLocation
+                ? $"{companion.FirstName} ({what}, {WhereIs(companion)})"
+                : $"{companion.FirstName} ({what})";
         }
 
         /// <summary>

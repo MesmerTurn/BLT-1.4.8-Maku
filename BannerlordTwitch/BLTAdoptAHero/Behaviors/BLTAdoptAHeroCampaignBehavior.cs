@@ -61,6 +61,15 @@ namespace BLTAdoptAHero
             public bool IsCreatedHero { get; set; } = false;
             public string LegacyName { get; set; } = null;
 
+            // Hired companions (bought with !buycompanion) are ordinary heroes in the viewer's
+            // clan, but they carry a class and an equipment tier of their own, so they get a
+            // HeroData entry like anybody else. These two fields are what tells them apart from
+            // the viewer's own hero and from the game's own wanderers.
+            public bool IsHiredCompanion { get; set; } = false;
+            // StringId of the hero who bought them. Stored by id rather than as a Hero reference
+            // so it survives the save round-trip the same way the rest of this class does.
+            public string CompanionOwnerId { get; set; } = null;
+
             // How many characters this viewer has had promoted out of their retinue, counted for
             // the lifetime of the hero. Kept as a running total rather than counted from the
             // campaign, because a promoted companion or lord can later die, be captured or leave -
@@ -1202,6 +1211,44 @@ namespace BLTAdoptAHero
 
         public void SetClass(Hero hero, HeroClassDef classDef)
             => GetHeroData(hero).ClassID = classDef?.ID ?? Guid.Empty;
+        #endregion
+
+        #region Hired companions
+
+        public void MarkHiredCompanion(Hero companion, Hero owner)
+        {
+            if (companion == null || owner == null) return;
+            var data = GetHeroData(companion);
+            data.IsHiredCompanion = true;
+            data.CompanionOwnerId = owner.StringId;
+        }
+
+        public bool IsHiredCompanion(Hero hero)
+            => hero != null && GetHeroData(hero).IsHiredCompanion;
+
+        public Hero GetCompanionOwner(Hero companion)
+        {
+            string id = companion == null ? null : GetHeroData(companion).CompanionOwnerId;
+            if (string.IsNullOrEmpty(id)) return null;
+            return heroData.Keys.FirstOrDefault(h => h.StringId == id);
+        }
+
+        /// <summary>
+        /// Everyone this hero has hired and still has. Living only: a dead companion is gone, and
+        /// counting them would quietly use up the viewer's allowance forever.
+        /// </summary>
+        public IEnumerable<Hero> GetHiredCompanions(Hero owner)
+        {
+            if (owner?.StringId == null) return Enumerable.Empty<Hero>();
+
+            return heroData
+                .Where(kv => kv.Value.IsHiredCompanion
+                             && kv.Value.CompanionOwnerId == owner.StringId
+                             && kv.Key != null && !kv.Key.IsDead)
+                .Select(kv => kv.Key)
+                .ToList();
+        }
+
         #endregion
 
         #region Achievement Passive Powers        
