@@ -52,6 +52,10 @@ namespace BLTAdoptAHero
             // not, or dying would simply hand the viewer a fresh set of them.
             public HashSet<Hero> CompanionsSpawned { get; } = new();
 
+            // Which party each companion was actually spawned from, so the right roster is tidied
+            // afterwards - it is not always this hero's own party any more.
+            public Dictionary<Hero, PartyBase> CompanionSpawnParties { get; } = new();
+
             public int ActiveRetinue => Retinue.Count(r => r.State == AgentState.Active);
             public int DeadRetinue => Retinue.Count(r => r.Died);
 
@@ -294,7 +298,12 @@ namespace BLTAdoptAHero
                     // as a named hero that could be dismissed like a troop but used for nothing.
                     foreach (var c in h.Companions)
                     {
-                        try { ReturnCompanion(c.Hero, h.Party, c.From, c.At); }
+                        try
+                        {
+                            var spawnedFrom = h.CompanionSpawnParties.TryGetValue(c.Hero, out var p)
+                                ? p : h.Party;
+                            ReturnCompanion(c.Hero, spawnedFrom, c.From, c.At);
+                        }
                         catch (Exception ex) { Log.Exception($"{nameof(BLTSummonBehavior)}.{nameof(ReturnCompanion)}", ex); }
                     }
                 }
@@ -384,24 +393,34 @@ namespace BLTAdoptAHero
                 var cfg = BLTAdoptAHeroModule.CommonConfig;
                 if (cfg?.SummonCompanions != true) return;
 
-                var clan = adoptedHero.Clan;
-                if (clan == null || clan.Leader != adoptedHero) return;
-
-                // Clan companions plus anyone this viewer has hired. A hired companion who has
-                // been given a noble title is no longer "companion of" the clan as far as the
-                // game is concerned, and would otherwise stop turning up to battles the moment
-                // they were promoted.
                 var campaign = BLTAdoptAHeroCampaignBehavior.Current;
-                var companions = (clan.Companions ?? Enumerable.Empty<Hero>())
-                    .Concat(campaign?.GetHiredCompanions(adoptedHero) ?? Enumerable.Empty<Hero>())
+                var clan = adoptedHero.Clan;
+
+                // Everyone this viewer has hired comes with them, always. The clan's own
+                // companions come only for its leader, because several viewers can share a clan
+                // and each of them would otherwise summon the same men over again.
+                //
+                // Requiring clan leadership for ALL of it was the bug Maku kept hitting: a viewer
+                // who is a member rather than the leader - which is most of them - brought nobody,
+                // including companions they had paid for themselves.
+                var companions = (campaign?.GetHiredCompanions(adoptedHero) ?? Enumerable.Empty<Hero>())
+                    .Concat(clan?.Leader == adoptedHero
+                        ? clan.Companions ?? Enumerable.Empty<Hero>()
+                        : Enumerable.Empty<Hero>())
                     .Distinct()
                     .Where(c => c != null && !c.IsDead && c != adoptedHero)
-                    .Where(c => c.PartyBelongedTo == null || c.PartyBelongedTo == adoptedHero.PartyBelongedTo)
                     // Nobody comes in twice in one battle, whatever happened to them the first time.
                     .Where(c => !existingHero.CompanionsSpawned.Contains(c))
+                    // Deliberately no test for where they are on the map. The viewer's own hero is
+                    // summoned out of thin air; holding their companions to a stricter rule than
+                    // that is how they ended up never appearing.
                     .ToList();
 
-                if (companions == null || companions.Count == 0) return;
+                if (companions.Count == 0)
+                {
+                    Log.Trace($"[Summon] {adoptedHero.FirstName}: no companions to bring in.");
+                    return;
+                }
 
                 int limit = cfg.MaxCompanionsSummoned;
                 if (limit > 0 && companions.Count > limit) companions = companions.Take(limit).ToList();
@@ -420,17 +439,26 @@ namespace BLTAdoptAHero
                     if (onPlayerSide && cfg.RetinueUseHeroesFormation)
                         Campaign.Current.SetPlayerFormationPreference(troop, ownerFormationClass);
 
+                    // Which party they fight from decides who can order them about. RTS Camera and
+                    // the game's own order UI only reach formations of the PLAYER's party, so a
+                    // companion spawned from a viewer's own party is on the field but beyond
+                    // anyone's control. Asked for by Maku so he can command them with RTS.
+                    var spawnParty = onPlayerSide && cfg.CompanionsJoinPlayerParty
+                        ? PartyBase.MainParty ?? existingHero.Party
+                        : existingHero.Party;
+
                     existingHero.CompanionsSpawned.Add(companion);
                     existingHero.Companions.Add((companion, companion.PartyBelongedTo, companion.CurrentSettlement));
+                    existingHero.CompanionSpawnParties[companion] = spawnParty;
 
                     // Only put them in the roster if they are not already in it. A companion who
                     // already travels with this party would otherwise be added a second time, and
                     // a TroopRoster holding the same hero twice has broken index tables - the
                     // crash then happens later, in whatever walks that roster next.
-                    if (!existingHero.Party.MemberRoster.Contains(troop))
-                        existingHero.Party.MemberRoster.AddToCounts(troop, 1);
+                    if (spawnParty?.MemberRoster != null && !spawnParty.MemberRoster.Contains(troop))
+                        spawnParty.MemberRoster.AddToCounts(troop, 1);
 
-                    var agent = SpawnAgent(onPlayerSide, troop, existingHero.Party,
+                    var agent = SpawnAgent(onPlayerSide, troop, spawnParty,
                         troop.IsMounted && mounted, false, !deploymentFlag);
 
                     if (agent == null) continue;
