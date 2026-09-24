@@ -501,13 +501,18 @@ namespace BLTAdoptAHero
                 // "nothing visible happened" is exactly how the last two bugs hid themselves.
                 if (arrived.Count > 0 && cfg.AnnounceCompanionArrival)
                 {
-                    Log.LogFeedEvent(arrived.Count == 1
+                    string message = arrived.Count == 1
                         ? "{=}{Companion} joins the battle with {Name}"
                             .Translate(("Companion", arrived[0]), ("Name", adoptedHero.FirstName.ToString()))
                         : "{=}{Count} companions join the battle with {Name}: {List}"
                             .Translate(("Count", arrived.Count),
                                 ("Name", adoptedHero.FirstName.ToString()),
-                                ("List", string.Join(", ", arrived))));
+                                ("List", string.Join(", ", arrived)));
+
+                    // On screen, not only in the overlay feed. The feed version went out first and
+                    // Maku never saw it - a message about a battle belongs in the battle.
+                    Log.ShowInformation(message, adoptedHero.CharacterObject);
+                    Log.LogFeedEvent(message);
                 }
             }
             catch (Exception ex)
