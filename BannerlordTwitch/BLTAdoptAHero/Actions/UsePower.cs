@@ -1,8 +1,9 @@
-﻿
+
 using System;
 using BannerlordTwitch;
 using BannerlordTwitch.Localization;
 using BannerlordTwitch.Util;
+using System.Collections.Generic;
 using System.Linq;
 using BLTAdoptAHero.Annotations;
 using TaleWorlds.CampaignSystem;
@@ -66,15 +67,25 @@ namespace BLTAdoptAHero
 
             try
             {
+                var campaign = BLTAdoptAHeroCampaignBehavior.Current;
+                var hired = campaign?.GetHiredCompanions(adoptedHero).ToList() ?? new List<Hero>();
+
                 foreach (var agent in Mission.Current.Agents.ToList())
                 {
                     if (agent == null || !agent.IsActive()) continue;
 
                     var companion = (agent.Character as CharacterObject)?.HeroObject;
                     if (companion == null || companion == adoptedHero) continue;
-                    if (companion.CompanionOf != clan) continue;
 
-                    heroClass.ActivePower.ActivateSilently(companion);
+                    // Either kind: a companion of the viewer's clan, or one they hired. A hired
+                    // companion given a noble title is no longer "companion of" anything, and was
+                    // being left out of the viewer's power exactly when they were at their best.
+                    if (companion.CompanionOf != clan && !hired.Contains(companion)) continue;
+
+                    // Their own class if they have one - a hired companion is a fighter in their
+                    // own right, not a copy of their owner - otherwise the viewer's.
+                    var theirClass = campaign?.GetClass(companion) ?? heroClass;
+                    theirClass.ActivePower.ActivateSilently(companion);
                 }
             }
             catch (Exception ex)

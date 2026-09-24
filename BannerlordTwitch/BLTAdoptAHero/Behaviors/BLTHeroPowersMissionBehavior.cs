@@ -38,7 +38,10 @@ namespace BLTAdoptAHero
         {
             SafeCall(() =>
             {
-                var hero = agent.GetAdoptedHero();
+                // GetAdoptedHero only answers for heroes carrying a viewer's name tag, so a hired
+                // companion - a real hero with a class of their own - was skipped here and went
+                // into every battle without the passive powers their class is supposed to give.
+                var hero = agent.GetAdoptedHero() ?? GetHiredCompanion(agent);
                 var heroClass = hero?.GetClass();
                 // If the hero has a class (thus can have passive powers), and isn't already
                 // known, then call the init method for the passive powers
@@ -48,6 +51,18 @@ namespace BLTAdoptAHero
                     BLTAdoptAHeroCampaignBehavior.Current?.ApplyAchievementPassivePowers(hero);
                 }
             });
+        }
+
+        /// <summary>
+        /// The hired companion behind an agent, if that is what it is. Kept narrow on purpose:
+        /// only heroes BLT itself recorded as hired companions, never the game's own wanderers.
+        /// </summary>
+        public static Hero GetHiredCompanion(Agent agent)
+        {
+            var hero = (agent?.Character as CharacterObject)?.HeroObject;
+            if (hero == null) return null;
+
+            return BLTAdoptAHeroCampaignBehavior.Current?.IsHiredCompanion(hero) == true ? hero : null;
         }
 
         public override void OnAgentBuild(Agent agent, Banner banner)
