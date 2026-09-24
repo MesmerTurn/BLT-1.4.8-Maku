@@ -42,6 +42,11 @@ namespace BLTAdoptAHero.UI
 
             [UsedImplicitly] public int RetinueKills;
 
+            // Companions kill for their viewer too, and those kills were being lumped in with
+            // nothing at all - Maku could not tell whether a companion had done anything.
+            [UsedImplicitly] public int Companions;
+            [UsedImplicitly] public int CompanionKills;
+
             [UsedImplicitly] public int GoldEarned;
             [UsedImplicitly] public int XPEarned;
         }
@@ -54,6 +59,7 @@ namespace BLTAdoptAHero.UI
             {
                 Kills = "{=AM2zlkem}Kills".Translate(),
                 RetinueKills = "{=79JXI4JL}+Retinue Kills".Translate(),
+                CompanionKills = "{=}+Companion Kills".Translate(),
                 Gold = "{=o0Q8Y1Qg}Gold".Translate(),
                 XP = "{=VtEJiMWy}XP".Translate(),
             });
