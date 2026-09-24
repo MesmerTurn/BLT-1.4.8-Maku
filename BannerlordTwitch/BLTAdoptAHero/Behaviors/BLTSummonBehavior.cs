@@ -430,6 +430,7 @@ namespace BLTAdoptAHero
                                && ownerIsMounted;
 
                 bool deploymentFlag = Mission.Current.Mode is MissionMode.Deployment;
+                var arrived = new List<string>();
 
                 foreach (var companion in companions)
                 {
@@ -491,7 +492,22 @@ namespace BLTAdoptAHero
                                 cfg.MinimumGoldPerKill);
                         });
 
+                    arrived.Add(companion.FirstName.ToString());
                     Log.Trace($"[Summon] Brought companion {companion.Name} in with {adoptedHero.FirstName}.");
+                }
+
+                // Say so on screen. Asked for by Maku: with a battle already full of men, there
+                // was no way to tell whether companions had turned up or quietly failed to - and
+                // "nothing visible happened" is exactly how the last two bugs hid themselves.
+                if (arrived.Count > 0 && cfg.AnnounceCompanionArrival)
+                {
+                    Log.LogFeedEvent(arrived.Count == 1
+                        ? "{=}{Companion} joins the battle with {Name}"
+                            .Translate(("Companion", arrived[0]), ("Name", adoptedHero.FirstName.ToString()))
+                        : "{=}{Count} companions join the battle with {Name}: {List}"
+                            .Translate(("Count", arrived.Count),
+                                ("Name", adoptedHero.FirstName.ToString()),
+                                ("List", string.Join(", ", arrived))));
                 }
             }
             catch (Exception ex)
