@@ -486,6 +486,12 @@ namespace BLTAdoptAHero
          PropertyOrder(40), UsedImplicitly]
         public bool CompanionsUsePowers { get; set; } = true;
 
+        [LocDisplayName("{=}Companions Fight From Your Party"),
+         LocCategory("General", "{=C5T6nnix}General"),
+         LocDescription("{=}Summoned companions join the battle from the streamer's own party, which is what lets RTS Camera and the game's order UI command them. Off puts them back in their viewer's party, where they fight on their own and nobody can order them."),
+         PropertyOrder(44), UsedImplicitly]
+        public bool CompanionsJoinPlayerParty { get; set; } = true;
+
         [LocDisplayName("{=}Hired Companions Climb Tiers"),
          LocCategory("General", "{=C5T6nnix}General"),
          LocDescription("{=}Companions hired with !buycompanion move up an equipment tier when the average of their class's own fighting skills passes the next threshold. Checked once a day. Turn off to leave them at the tier they were bought at."),
