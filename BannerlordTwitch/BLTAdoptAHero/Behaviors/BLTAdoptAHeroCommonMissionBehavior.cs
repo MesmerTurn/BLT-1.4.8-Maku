@@ -32,6 +32,7 @@ namespace BLTAdoptAHero
             public int WonXP { get; set; }
             public int Kills { get; set; }
             public int RetinueKills { get; set; }
+            public int CompanionKills { get; set; }
             public int KillStreak { get; set; }
         }
 
@@ -399,6 +400,8 @@ namespace BLTAdoptAHero
                     XPEarned = heroState.WonXP,
                     Kills = heroState.Kills,
                     RetinueKills = heroState.RetinueKills,
+                    CompanionKills = heroState.CompanionKills,
+                    Companions = summonState?.CompanionsSpawned?.Count ?? 0,
                 });
             }
         }
@@ -527,6 +530,14 @@ namespace BLTAdoptAHero
                 SkillXP.ImproveSkill(hero, xpPerKilled, SkillsEnum.All, auto: true);
                 GetHeroMissionState(hero).WonXP += xpPerKilled;
             }
+        }
+
+        /// <summary>
+        /// One more kill by one of this hero's companions, for the overlay.
+        /// </summary>
+        public void RecordCompanionKill(Hero hero)
+        {
+            if (hero != null) GetHeroMissionState(hero).CompanionKills++;
         }
 
         public void RecordGoldGain(Hero hero, int gold)

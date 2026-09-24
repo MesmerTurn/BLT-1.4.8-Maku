@@ -482,6 +482,10 @@ namespace BLTAdoptAHero
                     BLTAdoptAHeroCustomMissionBehavior.Current.AddListeners(agent,
                         onGotAKill: (killer, killed, state) =>
                         {
+                            // Counted separately from retinue kills, so the overlay can show what
+                            // a viewer's companions are actually contributing.
+                            BLTAdoptAHeroCommonMissionBehavior.Current.RecordCompanionKill(adoptedHero);
+
                             BLTAdoptAHeroCommonMissionBehavior.Current.ApplyKillEffects(
                                 adoptedHero, killer, killed, state,
                                 cfg.RetinueGoldPerKill,

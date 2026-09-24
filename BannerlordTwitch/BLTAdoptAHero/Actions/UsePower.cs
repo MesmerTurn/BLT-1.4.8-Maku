@@ -45,7 +45,20 @@ namespace BLTAdoptAHero
 
             if (allowed)
             {
-                ActivateForCompanions(adoptedHero, heroClass);
+                int companions = ActivateForCompanions(adoptedHero, heroClass);
+
+                // Say so in chat and on screen. Without it, a viewer has no way of knowing their
+                // companions joined in - and the whole feature is invisible.
+                if (companions > 0)
+                {
+                    string companionMessage = "{=}{Count} of {Name}'s companions use their powers"
+                        .Translate(("Count", companions), ("Name", adoptedHero.FirstName.ToString()));
+
+                    Log.ShowInformation(companionMessage, adoptedHero.CharacterObject);
+                    Log.LogFeedEvent(companionMessage);
+                    message += $" ({companions} companions too)";
+                }
+
                 onSuccess(message);
             }
             else
@@ -58,12 +71,14 @@ namespace BLTAdoptAHero
         /// The viewer's companions use the same powers, at the same moment, for as long. They
         /// fight as one group, so they should look like one.
         /// </summary>
-        private static void ActivateForCompanions(Hero adoptedHero, HeroClassDef heroClass)
+        private static int ActivateForCompanions(Hero adoptedHero, HeroClassDef heroClass)
         {
-            if (BLTAdoptAHeroModule.CommonConfig?.CompanionsUsePowers != true) return;
+            if (BLTAdoptAHeroModule.CommonConfig?.CompanionsUsePowers != true) return 0;
 
             var clan = adoptedHero.Clan;
-            if (clan == null || Mission.Current?.Agents == null) return;
+            if (Mission.Current?.Agents == null) return 0;
+
+            int activated = 0;
 
             try
             {
@@ -86,12 +101,15 @@ namespace BLTAdoptAHero
                     // own right, not a copy of their owner - otherwise the viewer's.
                     var theirClass = campaign?.GetClass(companion) ?? heroClass;
                     theirClass.ActivePower.ActivateSilently(companion);
+                    activated++;
                 }
             }
             catch (Exception ex)
             {
                 Log.Exception($"{nameof(UsePower)}.{nameof(ActivateForCompanions)}", ex);
             }
+
+            return activated;
         }
     }
 }
