@@ -1,4 +1,4 @@
-
+﻿
 using System;
 using BannerlordTwitch;
 using BannerlordTwitch.Localization;
@@ -95,7 +95,14 @@ namespace BLTAdoptAHero
                     // Either kind: a companion of the viewer's clan, or one they hired. A hired
                     // companion given a noble title is no longer "companion of" anything, and was
                     // being left out of the viewer's power exactly when they were at their best.
-                    if (companion.CompanionOf != clan && !hired.Contains(companion)) continue;
+                    // Careful with the clan test: a viewer with no clan has clan == null, and so
+                    // does every clanless hero on the field - bosses, wanderers, other viewers'
+                    // companions. Comparing the two directly made all of them count as this
+                    // viewer's companions, which is why the game announced companions nobody had
+                    // bought and then nothing happened. The clan match only means anything when
+                    // the viewer actually has a clan.
+                    bool clanCompanion = clan != null && companion.CompanionOf == clan;
+                    if (!clanCompanion && !hired.Contains(companion)) continue;
 
                     // Their own class if they have one - a hired companion is a fighter in their
                     // own right, not a copy of their owner - otherwise the viewer's.
