@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -179,6 +179,17 @@ namespace BLTAdoptAHero
         /// horse/camel family.
         /// </summary>
         private const int HeavyChariotChargeDamage = 80;
+
+        /// <summary>Does this item pull a chariot rather than carry a rider?</summary>
+        public bool IsChariot(ItemObject item)
+            => (item?.HorseComponent?.Monster?.StringId?.ToLowerInvariant() ?? "").Contains("chariot");
+
+        /// <summary>
+        /// Whether either chariot option is ticked, so a chariot should be looked for before an
+        /// ordinary mount when the class allows both.
+        /// </summary>
+        [YamlIgnore, Browsable(false)]
+        public bool WantsChariot => UseChariot || UseHeavyChariot;
 
         public bool AllowsMount(ItemObject item)
         {

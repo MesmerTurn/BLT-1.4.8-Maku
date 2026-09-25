@@ -426,16 +426,39 @@ namespace BLTAdoptAHero
             // is the top combat skill
             if (HeroShouldUseHorse(adoptedHero, classDef))
             {
-                var horse = FindNewEquipmentByType(
-                    ItemObject.ItemTypeEnum.Horse,
-                    h =>
-                        h.HorseComponent?.IsMount == true
-                        && (classDef == null
-                            || classDef.AllowsMount(h)
-                        ),
-                    // allow non-merchandise mounts, to include the tournament prize ones, and ignore ability to allow camel riders to ride something
-                    FindFlags.IgnoreAbility | FindFlags.AllowNonMerchandise
-                );
+                // A class that ticks a chariot option wants a chariot, not whatever mount happens
+                // to sit nearest the target tier. Eagle Rising ships exactly two chariots and
+                // neither declares a tier of its own, so with "Use Horse" also ticked they compete
+                // with every ordinary mount and a tier 6 hero draws a tier 6 horse practically
+                // every time - which is why "Use Chariot (Heavy)" at tier 6 produced no chariot.
+                // Ask for a chariot first, and fall back to the other allowed mounts only if this
+                // game has none.
+                var horse = EquipmentElement.Invalid;
+                if (classDef?.WantsChariot == true)
+                {
+                    horse = FindNewEquipmentByType(
+                        ItemObject.ItemTypeEnum.Horse,
+                        h => h.HorseComponent?.IsMount == true
+                             && classDef.IsChariot(h)
+                             && classDef.AllowsMount(h),
+                        FindFlags.IgnoreAbility | FindFlags.AllowNonMerchandise
+                    );
+                }
+
+                if (horse.IsEmpty)
+                {
+                    horse = FindNewEquipmentByType(
+                        ItemObject.ItemTypeEnum.Horse,
+                        h =>
+                            h.HorseComponent?.IsMount == true
+                            && (classDef == null
+                                || classDef.AllowsMount(h)
+                            ),
+                        // allow non-merchandise mounts, to include the tournament prize ones, and ignore ability to allow camel riders to ride something
+                        FindFlags.IgnoreAbility | FindFlags.AllowNonMerchandise
+                    );
+                }
+
                 if (!horse.IsEmpty)
                 {
                     adoptedHero.BattleEquipment[EquipmentIndex.Horse] = horse;

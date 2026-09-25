@@ -180,6 +180,14 @@ namespace BLTAdoptAHero
                     newHero.CompanionOf = adoptedHero.Clan;
                     newHero.SetNewOccupation(Occupation.Wanderer);
 
+                    // Record who they belong to independently of the clan. Most viewers have no
+                    // clan, and then both lines above set nothing at all - the companion ended up
+                    // owned by nobody, so !companions could not find them, summoning skipped them,
+                    // and the stray-hero sweep eventually deleted them as an orphan. Ownership by
+                    // id survives all of that, and having none was the real reason promoted
+                    // companions kept going missing.
+                    BLTAdoptAHeroCampaignBehavior.Current?.MarkHiredCompanion(newHero, adoptedHero);
+
                     if (adoptedHero.PartyBelongedTo != null)
                     {
                         AddHeroToPartyAction.Apply(newHero, adoptedHero.PartyBelongedTo);
