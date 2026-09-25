@@ -468,9 +468,63 @@ namespace BLTAdoptAHero
                         ItemObject.ItemTypeEnum.HorseHarness, h => horseType == h.ArmorComponent?.FamilyType
                         );
                 }
+                else
+                {
+                    // A mounted class that ends up on foot has had every candidate filtered out,
+                    // and from the outside that is indistinguishable from the mod not trying.
+                    // List what was actually on offer, so the log says which filter did it rather
+                    // than leaving us to guess.
+                    LogMountSearchFailure(adoptedHero, classDef, targetTier);
+                }
             }
 
             UpgradeCivilian(adoptedHero, targetTier, replaceSameTier, cultureFilter, cultureFilterSpecified, restrictedItemIds);
+        }
+
+        /// <summary>
+        /// Why a class that asked for a mount got none. Walks the same candidates the search used
+        /// and reports how far each one got, so the log names the filter that emptied the list.
+        /// </summary>
+        private static void LogMountSearchFailure(Hero hero, HeroClassDef classDef, int targetTier)
+        {
+            try
+            {
+                var mounts = CampaignHelpers.AllItems
+                    .Where(i => i.ItemType == ItemObject.ItemTypeEnum.Horse
+                                && i.HorseComponent?.IsMount == true)
+                    .ToList();
+
+                var allowed = mounts.Where(i => classDef == null || classDef.AllowsMount(i)).ToList();
+                var restricted = BLTAdoptAHeroModule.CommonConfig.RestrictedItemIds;
+
+                Log.Info($"[Equip] {hero?.Name} wanted a mount at tier {targetTier} "
+                         + $"(class '{classDef?.Name}', mounts: {classDef?.MountDescription}) and got none. "
+                         + $"{mounts.Count} mounts exist, {allowed.Count} pass the class filter.");
+
+                foreach (var item in allowed.Take(10))
+                {
+                    Log.Info($"[Equip]   candidate {item.StringId} tier {(int) item.Tier} "
+                             + $"culture {item.Culture?.StringId ?? "none"} "
+                             + $"charge {item.HorseComponent?.ChargeDamage ?? 0} "
+                             + $"merchandise {!item.NotMerchandise} "
+                             + $"restricted {restricted.Contains(item.StringId ?? "")} "
+                             + $"usable {CanUseItem(hero, item, true, classDef?.Mounted == true)}");
+                }
+
+                if (allowed.Count == 0)
+                {
+                    foreach (var item in mounts.Where(i => classDef?.IsChariot(i) == true))
+                    {
+                        Log.Info($"[Equip]   chariot {item.StringId} rejected by the class filter: "
+                                 + $"monster {item.HorseComponent?.Monster?.StringId}, "
+                                 + $"charge {item.HorseComponent?.ChargeDamage ?? 0}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Exception($"{nameof(EquipHero)}.{nameof(LogMountSearchFailure)}", ex);
+            }
         }
 
         public static bool HeroShouldUseHorse(Hero adoptedHero, HeroClassDef classDef)
