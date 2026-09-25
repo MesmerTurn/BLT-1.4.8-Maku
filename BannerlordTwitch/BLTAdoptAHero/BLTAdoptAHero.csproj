@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\PropertyChanged.Fody.4.1.0\build\PropertyChanged.Fody.props" Condition="Exists('..\packages\PropertyChanged.Fody.4.1.0\build\PropertyChanged.Fody.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -427,6 +427,7 @@
     <Compile Include="Behaviors\BLTBattleEventsBehavior.cs" />
     <Compile Include="Behaviors\BLTRallyBehavior.cs" />
     <Compile Include="Actions\UnguardCommand.cs" />
+    <Compile Include="Behaviors\BLTRosterRepairBehavior.cs" />
     <Compile Include="Behaviors\BLTStrayHeroCleanupBehavior.cs" />
     <Compile Include="Behaviors\BLTHiredCompanionBehavior.cs" />
     <Compile Include="Actions\FollowCommand.cs" />
@@ -627,7 +628,7 @@
   <Import Project="$(SolutionDir)BLTBuildTargets.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
-      <ErrorText>Ce projet fait rÄ‚Â©fÄ‚Â©rence Ä‚Â  des packages NuGet qui sont manquants sur cet ordinateur. Utilisez l'option de restauration des packages NuGet pour les tÄ‚Â©lÄ‚Â©charger. Pour plus d'informations, consultez http://go.microsoft.com/fwlink/?LinkID=322105. Le fichier manquant est : {0}.</ErrorText>
+      <ErrorText>Ce projet fait rĂ„â€šĂ‚Â©fĂ„â€šĂ‚Â©rence Ă„â€šĂ‚Â  des packages NuGet qui sont manquants sur cet ordinateur. Utilisez l'option de restauration des packages NuGet pour les tĂ„â€šĂ‚Â©lĂ„â€šĂ‚Â©charger. Pour plus d'informations, consultez http://go.microsoft.com/fwlink/?LinkID=322105. Le fichier manquant est : {0}.</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('..\packages\PropertyChanged.Fody.4.1.0\build\PropertyChanged.Fody.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\PropertyChanged.Fody.4.1.0\build\PropertyChanged.Fody.props'))" />
     <Error Condition="!Exists('..\packages\Fody.6.9.1\build\Fody.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Fody.6.9.1\build\Fody.targets'))" />
