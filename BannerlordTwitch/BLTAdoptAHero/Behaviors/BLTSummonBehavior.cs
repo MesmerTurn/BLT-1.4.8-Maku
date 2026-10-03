@@ -130,11 +130,28 @@ namespace BLTAdoptAHero
                                        withRetinue: true);
 
                 // First spawn, so spawn retinue also
-                if (heroSummonState.TimesSummoned == 0 && heroSummonState.SpawnWithRetinue && RetinueAllowed())
+                if (heroSummonState.TimesSummoned == 0 && heroSummonState.SpawnWithRetinue && RetinueAllowed()
+                    && agent.Formation != null)
                 {
+                    // Not from here. OnAgentBuild is the engine calling us from inside its own
+                    // spawning loop, so spawning a retinue straight from it adds agents to the
+                    // loop that is running. With one BLT hero in a battle the engine survives
+                    // that; with two it stops making progress and the battle never finishes
+                    // loading - and nothing throws, so there is no crash report either.
+                    //
+                    // !summon and !attack were never affected because they go through DoNextTick,
+                    // and the comment on that call already says why: troop spawning has to be
+                    // synchronised to OnMissionTick or the engine misbehaves. Heroes who were
+                    // simply in a party when the battle started never went through it.
                     var formationClass = agent.Formation.FormationIndex;
-                    SpawnRetinue(adoptedHero, ShouldBeMounted(formationClass), formationClass,
-                        heroSummonState, heroSummonState.WasPlayerSide);
+                    bool wasPlayerSide = heroSummonState.WasPlayerSide;
+                    var stateForRetinue = heroSummonState;
+                    DoNextTick(() =>
+                    {
+                        if (Mission.Current == null) return;
+                        SpawnRetinue(adoptedHero, ShouldBeMounted(formationClass), formationClass,
+                            stateForRetinue, wasPlayerSide);
+                    });
                 }
 
                 // Companions come in on EVERY summon, and whether or not retinue is allowed here.
@@ -270,15 +287,17 @@ namespace BLTAdoptAHero
 
         public override void OnMissionTick(float dt)
         {
-            SafeCall(() =>
+            // One SafeCall per action, not one around the whole loop. The list is cleared before
+            // any of them run, so with a single wrapper the first action to throw took every
+            // action still queued behind it down with it - already discarded, never run, never
+            // retried, and nothing written down about them. With two viewers summoning into the
+            // same battle that is one hero spawning and the other silently vanishing.
+            var actionsToDo = onTickActions.ToList();
+            onTickActions.Clear();
+            foreach (var action in actionsToDo)
             {
-                var actionsToDo = onTickActions.ToList();
-                onTickActions.Clear();
-                foreach (var action in actionsToDo)
-                {
-                    action();
-                }
-            });
+                SafeCall(action);
+            }
         }
 
         protected override void OnEndMission()
